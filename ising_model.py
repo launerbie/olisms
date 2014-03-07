@@ -20,6 +20,7 @@ class Ising(object):
         self.shape = (rij, kolom)
         self.total_energy = self.calc_energy()
 
+
     def makegrid(self, x, y):
         """ 
         Function that makes a numpy array with x rows and y columns and fills 
@@ -104,7 +105,6 @@ class Ising(object):
                 else:
                     d_energy = -self.grid[x][y]*(self.grid[0][y] + self.grid[x-1][y] + self.grid[x][0] + self.grid[x][y-1])
                 
-
         return d_energy
 
 
@@ -125,7 +125,6 @@ class Ising(object):
             if determinant <= prob:                     
                 self.grid[x][y] = -self.grid[x][y]
                 return True
-
             else:
                 return False
 
