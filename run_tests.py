@@ -141,7 +141,8 @@ class test_delta_energy_periodic_1(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    from colored import ColoredTextTestRunner
+    unittest.main(verbosity=2, testRunner=ColoredTextTestRunner)
 
        
         
