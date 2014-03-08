@@ -105,11 +105,11 @@ class Ising(object):
                 else:
                     d_energy = -self.grid[x][y]*(self.grid[0][y] + self.grid[x-1][y] + self.grid[x][0] + self.grid[x][y-1])
                 
-        return d_energy
+        return 2*d_energy
 
 
     def boltzmann(self, delta_energy, beta=0.0001):
-        return np.exp(-beta*delta_energy) 
+        return np.exp(beta*delta_energy) 
 
     
     def flip(self, prob, site):
