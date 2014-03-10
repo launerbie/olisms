@@ -2,14 +2,15 @@
 import subprocess 
 import numpy as np
 import random as rnd
+import matplotlib.pyplot as plt
 
 def main():
 
-    i = Ising(40, 40)
+    i = Ising(36, 35)
 #    print(i.calc_energy())
 #    i.printlattice()
     i.evolve(100000)
-
+    i.plotevolution()
 
 class Ising(object):
     
@@ -108,7 +109,7 @@ class Ising(object):
         return 2*d_energy
 
 
-    def boltzmann(self, delta_energy, beta=0.0001):
+    def boltzmann(self, delta_energy, beta=0.001):
         return np.exp(beta*delta_energy) 
 
     
@@ -132,6 +133,8 @@ class Ising(object):
 
     def evolve(self, iteraties):
         i = 0
+        energy_as_function_of_time = []
+
         while i < iteraties:
             site = self.choose_site()
             delta_e = self.delta_energy(site)
@@ -143,9 +146,30 @@ class Ising(object):
                 self.total_energy = self.total_energy + delta_e
                 if i % 500:
                     self.printlattice()
+                
+            energy_as_function_of_time.append(self.total_energy) # For plotting E(t). Builds list of total energy per iteration.
 
             i = i + 1
          
+        self.time_variable = np.arange(iteraties) # For plotting E(t). This array will be the time axis
+        self.energy_variable = np.array(energy_as_function_of_time) # For plotting E(t). This array will be the energy axis
+
+    def plotevolution(self):
+        """
+        Makes a plot of total system energy as a funtion of time (iterations) based on the data collected in 
+        the function "evolve". The plot is saved under the name "evolution.png"
+        """
+
+        E = self.energy_variable
+        t = self.time_variable
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        ax.plot(t, E)
+        plt.savefig("evolution")
+
+
 
     def printlattice(self):
         """
