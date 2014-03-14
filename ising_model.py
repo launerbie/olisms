@@ -1,15 +1,15 @@
 #!/bin/usr/env python3
-import subprocess 
+import argparse
 import numpy as np
 import random as rnd
 import matplotlib.pyplot as plt
 
 def main():
 
-    i = Ising(100, 100)
+    i = Ising(40, 40)
 #    print(i.calc_energy())
 #    i.printlattice()
-    i.evolve(10000)
+    i.evolve(args.iterations, args.beta)
 #    i.plotevolution()
 
 class Ising(object):
@@ -137,14 +137,14 @@ class Ising(object):
 
         
 
-    def evolve(self, iteraties):
+    def evolve(self, iteraties, beta):
         i = 0
         energy_as_function_of_time = []
 
         while i < iteraties:
             site = self.choose_site() # choose random site at the beginning of each iteration
             delta_e = self.delta_energy(site) # calculate energy change if that spin were flipped
-            probability = self.boltzmann(delta_e) 
+            probability = self.boltzmann(delta_e, beta) 
             flipped = self.flip(probability, site) # flip spin with probability exp(beta*delta_e)
                                                    # and return boolean indicating if flipped.
             
@@ -194,8 +194,21 @@ class Ising(object):
         print(str_ising)
         print("\n")
 
+def get_arguments():
+    """
+    To add arguments, call: parser.add_argument
+    
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-b', '--beta', default=1000, type=float, help="The Beta Parameter") 
+    parser.add_argument('-i', '--iterations', default=100000, type=int, help="Number of iterations, default: 100000") 
+    # Add your arguments here. See below for examples.
+    args = parser.parse_args()
+    return args
+
 
 if __name__ == "__main__":
+    args = get_arguments()
     np.set_printoptions(threshold=np.nan, linewidth= 300)
     main()
 
