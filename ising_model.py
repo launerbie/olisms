@@ -113,7 +113,9 @@ class Ising(object):
                     d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][0] + grd[x][y-1])
                 
         return 2*d_energy 
-
+    
+    def magnetization(self):
+        return self.grid.sum()
 
     def boltzmann(self, delta_energy, beta=1000):
         return np.exp(beta*delta_energy) 
@@ -211,6 +213,40 @@ if __name__ == "__main__":
     args = get_arguments()
     np.set_printoptions(threshold=np.nan, linewidth= 300)
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

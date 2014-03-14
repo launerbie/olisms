@@ -91,6 +91,8 @@ class test_calc_energy_periodic(unittest.TestCase):
         I.grid = model
         self.assertEqual(I.calc_energy(), -10)
 
+        
+
 class test_delta_energy_periodic_1(unittest.TestCase):
     def setUp(self):
         self.model = numpy.array([[1,1,1],
@@ -138,6 +140,22 @@ class test_delta_energy_periodic_1(unittest.TestCase):
         I = self.ising
         self.assertEqual(I.delta_energy((2, 2)), -8)
 
+
+class test_magnetization(unittest.TestCase):
+    def setUp(self):
+        self.model = numpy.array([[-1,-1,-1],
+                                  [1,1,1],
+                                  [1,1,1]])
+
+        self.ising = ising_model.Ising()
+        self.ising.grid = self.model
+        self.ising.rij = 3 
+        self.ising.kolom = 3 
+
+    def test_magnetization(self):
+        I = self.ising
+
+        self.assertEqual(I.magnetization(), 3)
 
 
 if __name__ == '__main__':
