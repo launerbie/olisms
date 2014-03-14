@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 
 def main():
 
-    i = Ising(36, 35)
+    i = Ising(100, 100)
 #    print(i.calc_energy())
 #    i.printlattice()
-    i.evolve(100000)
-    i.plotevolution()
+    i.evolve(10000)
+#    i.plotevolution()
 
 class Ising(object):
     
@@ -63,7 +63,7 @@ class Ising(object):
 
     def choose_site(self):
         """
-        Randomly dooses site to flip
+        Randomly chooses site to flip
         """
         site_x = np.random.randint(0,self.rij)
         site_y = np.random.randint(0,self.kolom)
@@ -71,45 +71,51 @@ class Ising(object):
         return site_x, site_y
   
     def delta_energy(self, site):
-        
-        rechts = self.rij - 1
-        onder = self.kolom - 1 
+       
+        """
+        Berekent verandering in energie als gevolg van het omdraaien van het teken (spin flip)
+        op de positie aangegeven door het verplichte argument "site".
+        """
+ 
+        rechts = self.rij - 1  # zou eigenlijk onder moeten heten, heeft geen invloed op programma.
+        onder = self.kolom - 1  # zou eigenlijk rechts moeten heten.
         x, y = site
+        grd = self.grid
         
         if not (x == 0 or x == rechts or y == 0 or y == onder): # niet rand ==> midden 
-            d_energy = -self.grid[x][y]*(self.grid[x+1][y] + self.grid[x-1][y] + self.grid[x][y+1] + self.grid[x][y-1])
+            d_energy = -grd[x][y]*(grd[x+1][y] + grd[x-1][y] + grd[x][y+1] + grd[x][y-1])
 
         else: # rand
             if not ((x == 0 and (y == 0 or y == onder)) or (x == rechts and (y == 0 or y == onder))): # rand & niet hoek
                 if x == 0: # linkerrand
-                    d_energy = -self.grid[x][y]*(self.grid[x+1][y] + self.grid[rechts][y] + self.grid[x][y+1] + self.grid[x][y-1])
+                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[rechts][y] + grd[x][y+1] + grd[x][y-1])
 
                 elif x == rechts: # rechterrand
-                    d_energy = -self.grid[x][y]*(self.grid[0][y] + self.grid[x-1][y] + self.grid[x][y+1] + self.grid[x][y-1])
+                    d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][y+1] + grd[x][y-1])
 
                 elif y == 0: # boven
-                    d_energy = -self.grid[x][y]*(self.grid[x+1][y] + self.grid[x-1][y] + self.grid[x][y+1] + self.grid[x][onder])
+                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[x-1][y] + grd[x][y+1] + grd[x][onder])
 
                 else: # onder
-                    d_energy = -self.grid[x][y]*(self.grid[x+1][y] + self.grid[x-1][y] + self.grid[x][0] + self.grid[x][y-1])
+                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[x-1][y] + grd[x][0] + grd[x][y-1])
 
             else: # rand & hoek ==> hoek
                 if (x == 0 and y == 0):
-                    d_energy = -self.grid[x][y]*(self.grid[x+1][y] + self.grid[rechts][y] + self.grid[x][y+1] + self.grid[x][onder])
+                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[rechts][y] + grd[x][y+1] + grd[x][onder])
 
                 elif (x == 0 and y == onder):
-                    d_energy = -self.grid[x][y]*(self.grid[x+1][y] + self.grid[rechts][y] + self.grid[x][0] + self.grid[x][y-1])
+                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[rechts][y] + grd[x][0] + grd[x][y-1])
 
                 elif (x == rechts and y == 0):
-                    d_energy = -self.grid[x][y]*(self.grid[0][y] + self.grid[x-1][y] + self.grid[x][y+1] + self.grid[x][onder])
+                    d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][y+1] + grd[x][onder])
 
                 else:
-                    d_energy = -self.grid[x][y]*(self.grid[0][y] + self.grid[x-1][y] + self.grid[x][0] + self.grid[x][y-1])
+                    d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][0] + grd[x][y-1])
                 
-        return 2*d_energy
+        return 2*d_energy 
 
 
-    def boltzmann(self, delta_energy, beta=0.001):
+    def boltzmann(self, delta_energy, beta=1000):
         return np.exp(beta*delta_energy) 
 
     
@@ -136,10 +142,11 @@ class Ising(object):
         energy_as_function_of_time = []
 
         while i < iteraties:
-            site = self.choose_site()
-            delta_e = self.delta_energy(site)
-            probability = self.boltzmann(delta_e)
-            flipped = self.flip(probability, site)
+            site = self.choose_site() # choose random site at the beginning of each iteration
+            delta_e = self.delta_energy(site) # calculate energy change if that spin were flipped
+            probability = self.boltzmann(delta_e) 
+            flipped = self.flip(probability, site) # flip spin with probability exp(beta*delta_e)
+                                                   # and return boolean indicating if flipped.
             
             
             if flipped and delta_e != 0:
@@ -189,7 +196,7 @@ class Ising(object):
 
 
 if __name__ == "__main__":
-    np.set_printoptions(threshold=np.nan, linewidth= 120)
+    np.set_printoptions(threshold=np.nan, linewidth= 300)
     main()
 
 
