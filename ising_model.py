@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 def main():
 
-    i = Ising(args.height, args.width, araturergs.bfield, args.temperature)
+    i = Ising(args.x, args.y, args.bfield, args.temperature)
 #    print(i.calc_energy())
 #    i.printlattice()
     i.evolve(args.iterations)
@@ -223,12 +223,12 @@ def get_arguments():
     
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--temperature', default=0.001, type=float, help="The Temperature") 
+    parser.add_argument('-T', '--temperature', default=0.001, type=float, help="The Temperature") 
     parser.add_argument('-i', '--iterations', default=100000, type=int, help="Number of iterations, default: 100000") 
     parser.add_argument('-b', '--bfield', default=0.00, type=float, help="Uniform external magnetic field, default: 0") 
-    parser.add_argument('-y', '--width', default=40,type=int, help="number of collumns (width)") 
-    parser.add_argument('-x', '--height', default=40,type=int, help="number of rows (height)") 
-    parser.add_argument('-f', '--filename', default=0, help="hdf5 output file name") 
+    parser.add_argument('-y', default=40,type=int, help="number of collumns (width)") 
+    parser.add_argument('-x', default=40,type=int, help="number of rows (height)") 
+    parser.add_argument('-f', '--filename', default='test.hdf5', help="hdf5 output file name") 
     parser.add_argument('-p', '--printit', default=0,type=int, help="print lattice every p flips") 
     # Add your arguments here. See below for examples.
     args = parser.parse_args()
