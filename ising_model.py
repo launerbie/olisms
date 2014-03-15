@@ -1,26 +1,33 @@
-#!/bin/usr/env python3
+#!/bin/usr/env python
+
 import argparse
 import numpy as np
 import random as rnd
+from hdf5utils import HDF5Handler
 import matplotlib.pyplot as plt
 
 def main():
 
-    i = Ising(40, 40)
+    i = Ising(args.height, args.width, araturergs.bfield, args.temperature)
 #    print(i.calc_energy())
 #    i.printlattice()
-    i.evolve(args.iterations, args.beta)
-#    i.plotevolution()
+    i.evolve(args.iterations)
+    i.plotevolution()
 
 class Ising(object):
     
-    def __init__(self, rij=10, kolom=10):
+    def __init__(self, rij=40, kolom=40, field=0, temperature=0.01):
         self.makegrid(rij, kolom)
         self.rij = rij
         self.kolom = kolom
+        self.b_field = field
+        self.temperature = temperature
         self.shape = (rij, kolom)
         self.total_energy = self.calc_energy()
 
+    @property
+    def beta(self):
+        return 1/self.temperature
 
     def makegrid(self, x, y):
         """ 
@@ -32,7 +39,7 @@ class Ising(object):
 
         self.grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
 
-    def calc_energy(self):
+    def calc_energy(self): #b_field parameter toegevoegd op 14/03/2014.
         """
         Function that iterates through the ising array and calculates product 
         of its value with right and lower neighbor. Boundary conditions link 
@@ -42,8 +49,9 @@ class Ising(object):
         x = self.rij        #For less writing
         y = self.kolom        
         grd = self.grid
+        magnetization = self.magnetization()
 
-        energy = 0
+        energy = self.b_field * magnetization
         for i in range(grd.shape[0]):
             for j in range(grd.shape[1]):
             
@@ -112,13 +120,14 @@ class Ising(object):
                 else:
                     d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][0] + grd[x][y-1])
                 
-        return 2*d_energy 
-    
+        return -2*d_energy + 2*self.b_field*grd[x][y] # toegevoegd: -2B*site; verandering in energie als 
+                                                     # gevolg van spin flip in extern veld van sterkte B
+
     def magnetization(self):
         return self.grid.sum()
 
-    def boltzmann(self, delta_energy, beta=1000):
-        return np.exp(beta*delta_energy) 
+    def boltzmann(self, delta_energy):
+        return np.exp(-self.beta*delta_energy) 
 
     
     def flip(self, prob, site):
@@ -139,27 +148,39 @@ class Ising(object):
 
         
 
-    def evolve(self, iteraties, beta):
-        i = 0
-        energy_as_function_of_time = []
+    def evolve(self, iteraties):
 
-        while i < iteraties:
-            site = self.choose_site() # choose random site at the beginning of each iteration
-            delta_e = self.delta_energy(site) # calculate energy change if that spin were flipped
-            probability = self.boltzmann(delta_e, beta) 
-            flipped = self.flip(probability, site) # flip spin with probability exp(beta*delta_e)
-                                                   # and return boolean indicating if flipped.
-            
-            
-            if flipped and delta_e != 0:
-                self.total_energy = self.total_energy + delta_e
-                if i % 500:
-                    self.printlattice()
+        with HDF5Handler(args.filename) as h:
+
+            energy_as_function_of_time = []
+            i = 0
+            while i < iteraties:
+
+                if i % 1000 == 0:
+                    print(i)
+ 
+                site = self.choose_site() # choose random site at the beginning of each iteration
+                delta_e = self.delta_energy(site) # calculate energy change if that spin were flipped
+                probability = self.boltzmann(delta_e) 
+                flipped = self.flip(probability, site) # flip spin with probability exp(beta*delta_e)
+                                                       # and return boolean indicating if flipped.
                 
-            energy_as_function_of_time.append(self.total_energy) # For plotting E(t). Builds list of total energy per iteration.
+                
+                if flipped and delta_e != 0:
+                    self.total_energy = self.total_energy + delta_e
 
-            i = i + 1
-         
+                    h.append(np.array(site), 'site')
+                    h.append(np.array(i), 'iteration')
+                    h.append(np.array(self.total_energy), 'energy')
+
+                    if args.printit != 0:
+                        if i % args.printit == 0 :
+                            self.printlattice()
+                    
+                energy_as_function_of_time.append(self.total_energy) # For plotting E(t). Builds list of total energy per iteration.
+
+                i = i + 1
+             
         self.time_variable = np.arange(iteraties) # For plotting E(t). This array will be the time axis
         self.energy_variable = np.array(energy_as_function_of_time) # For plotting E(t). This array will be the energy axis
 
@@ -172,7 +193,7 @@ class Ising(object):
         E = self.energy_variable
         t = self.time_variable
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(20,4))
         ax = fig.add_subplot(111)
 
         ax.plot(t, E)
@@ -202,8 +223,13 @@ def get_arguments():
     
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--beta', default=1000, type=float, help="The Beta Parameter") 
+    parser.add_argument('-t', '--temperature', default=0.001, type=float, help="The Temperature") 
     parser.add_argument('-i', '--iterations', default=100000, type=int, help="Number of iterations, default: 100000") 
+    parser.add_argument('-b', '--bfield', default=0.00, type=float, help="Uniform external magnetic field, default: 0") 
+    parser.add_argument('-y', '--width', default=40,type=int, help="number of collumns (width)") 
+    parser.add_argument('-x', '--height', default=40,type=int, help="number of rows (height)") 
+    parser.add_argument('-f', '--filename', default=0, help="hdf5 output file name") 
+    parser.add_argument('-p', '--printit', default=0,type=int, help="print lattice every p flips") 
     # Add your arguments here. See below for examples.
     args = parser.parse_args()
     return args
@@ -212,29 +238,8 @@ def get_arguments():
 if __name__ == "__main__":
     args = get_arguments()
     np.set_printoptions(threshold=np.nan, linewidth= 300)
+    print(args)
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
