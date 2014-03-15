@@ -1,0 +1,7 @@
+*.swp
+*.pyc
+*.png
+*.jpg
+*.hdf5
+*__pycache__
+
