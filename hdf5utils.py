@@ -158,7 +158,7 @@ class HDF5Handler(object):
         When the number of h.append calls is not a multiple of buffersize, then there 
         will be unwritten arrays in dbuffer, since dbuffer is only written when it is full.
         """
-        for dset in self.index.itervalues():
+        for dset in self.index.values():
             dset.flush()
             
 
