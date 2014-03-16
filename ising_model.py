@@ -15,14 +15,22 @@ def main():
     i.plotevolution()
 
 class Ising(object):
+    """
+    Parameters
+    ----------
+    rij : number of rows in lattice
+    kolom: number of columns in lattice
+    b_field: strength of the uniform b-field
+    temperature: temperature 
     
-    def __init__(self, rij=40, kolom=40, field=0, temperature=0.01):
+    """ 
+    def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=0.01):
         self.makegrid(rij, kolom)
         self.rij = rij
         self.kolom = kolom
-        self.b_field = field
-        self.temperature = temperature
         self.shape = (rij, kolom)
+        self.b_field = b_field
+        self.temperature = temperature
         self.total_energy = self.calc_energy()
 
     @property
@@ -34,24 +42,21 @@ class Ising(object):
         Function that makes a numpy array with x rows and y columns and fills 
         the entries randomly with '1' or '-1'
         """
-        #entries = [rnd.choice([-1,1]) for i in range (x*y)]
-        #self.grid = np.array(entries).reshape(x, y)
-
         self.grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
 
-    def calc_energy(self): #b_field parameter toegevoegd op 14/03/2014.
+    def calc_energy(self): 
         """
         Function that iterates through the ising array and calculates product 
         of its value with right and lower neighbor. Boundary conditions link 
-        last entry in row with first in row and last entry in collumn with 
-        first in collum (torus).
+        last entry in row with first in row and last entry in column with 
+        first in column (torus).
+
         """
-        x = self.rij        #For less writing
+        x = self.rij        
         y = self.kolom        
         grd = self.grid
-        magnetization = self.magnetization()
 
-        energy = self.b_field * magnetization
+        energy = self.b_field * self.magnetization()
         for i in range(grd.shape[0]):
             for j in range(grd.shape[1]):
             
@@ -73,16 +78,16 @@ class Ising(object):
         """
         Randomly chooses site to flip
         """
+        #TODO: 3D array
         site_x = np.random.randint(0,self.rij)
         site_y = np.random.randint(0,self.kolom)
         
         return site_x, site_y
   
     def delta_energy(self, site):
-       
         """
         Berekent verandering in energie als gevolg van het omdraaien van het teken (spin flip)
-        op de positie aangegeven door het verplichte argument "site".
+        op de positie "site".
         """
  
         rechts = self.rij - 1  # zou eigenlijk onder moeten heten, heeft geen invloed op programma.
@@ -147,24 +152,18 @@ class Ising(object):
                 return False
 
         
-
     def evolve(self, iteraties):
 
-        with HDF5Handler(args.filename) as h:
+        with HDF5Handler(args.filename) as h: #FIXME: HDF5Handler shouldn't be called in evolve()
 
-            energy_as_function_of_time = []
+            energy_as_function_of_time = [] #TODO: remove when plotting module is ready
             i = 0
             while i < iteraties:
-
-                if i % 1000 == 0:
-                    print(i)
- 
-                site = self.choose_site() # choose random site at the beginning of each iteration
+                site = self.choose_site() 
                 delta_e = self.delta_energy(site) # calculate energy change if that spin were flipped
                 probability = self.boltzmann(delta_e) 
-                flipped = self.flip(probability, site) # flip spin with probability exp(beta*delta_e)
+                flipped = self.flip(probability, site) # flip spin with probability exp(-beta*delta_e)
                                                        # and return boolean indicating if flipped.
-                
                 
                 if flipped and delta_e != 0:
                     self.total_energy = self.total_energy + delta_e
@@ -177,10 +176,10 @@ class Ising(object):
                         if i % args.printit == 0 :
                             self.printlattice()
                     
-                energy_as_function_of_time.append(self.total_energy) # For plotting E(t). Builds list of total energy per iteration.
-
+                energy_as_function_of_time.append(self.total_energy) #TODO: remove when plotting module is ready
                 i = i + 1
-             
+
+        #TODO: remove next two lines when plotting module is ready
         self.time_variable = np.arange(iteraties) # For plotting E(t). This array will be the time axis
         self.energy_variable = np.array(energy_as_function_of_time) # For plotting E(t). This array will be the energy axis
 
@@ -200,7 +199,6 @@ class Ising(object):
         plt.savefig("evolution")
 
 
-
     def printlattice(self):
         """
         Prints the lattice.
@@ -211,7 +209,6 @@ class Ising(object):
         grd = self.grid
 
         str_ising = np.empty(grd.size, dtype='int').reshape( grd.shape )
-        #str_ising = np.empty(grd.size , dtype='str').reshape( grd.shape )
         str_ising[ np.where(grd == 1) ] = 1 
         str_ising[ np.where(grd == -1) ] = 8 
         print(str_ising)
@@ -223,6 +220,7 @@ def get_arguments():
     
     """
     parser = argparse.ArgumentParser()
+
     parser.add_argument('-T', '--temperature', default=0.001, type=float, help="The Temperature") 
     parser.add_argument('-i', '--iterations', default=100000, type=int, help="Number of iterations, default: 100000") 
     parser.add_argument('-b', '--bfield', default=0.00, type=float, help="Uniform external magnetic field, default: 0") 
@@ -230,28 +228,15 @@ def get_arguments():
     parser.add_argument('-x', default=40,type=int, help="number of rows (height)") 
     parser.add_argument('-f', '--filename', default='test.hdf5', help="hdf5 output file name") 
     parser.add_argument('-p', '--printit', default=0,type=int, help="print lattice every p flips") 
-    # Add your arguments here. See below for examples.
+
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
     args = get_arguments()
+    #TODO: get maximum linewidth available in terminal and set this in np.set_printoptions
     np.set_printoptions(threshold=np.nan, linewidth= 300)
     print(args)
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
