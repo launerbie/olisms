@@ -18,7 +18,7 @@ class Ising(object):
     temperature: temperature 
     
     """ 
-    def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=0.01, 
+    def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=10, 
                  handler=None, h5path=None, printit=None):
         self.makegrid(rij, kolom)
         self.rij = rij
@@ -37,7 +37,9 @@ class Ising(object):
 
     @property
     def beta(self):
-        return 1.0/self.temperature
+        #kB = 1.3806488e-23 J K^-1
+        kB = 1
+        return 1.0/(kB*self.temperature)
 
     def makegrid(self, x, y):
         """ 
