@@ -2,7 +2,6 @@
 
 import argparse
 import numpy as np
-from hdf5utils import HDF5Handler
 
 def main():
     #TODO: remove main(). 
@@ -19,7 +18,8 @@ class Ising(object):
     temperature: temperature 
     
     """ 
-    def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=0.01):
+    def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=0.01, 
+                 handler=None, h5path=None, printit=None):
         self.makegrid(rij, kolom)
         self.rij = rij
         self.kolom = kolom
@@ -27,10 +27,17 @@ class Ising(object):
         self.b_field = b_field
         self.temperature = temperature
         self.total_energy = self.calc_energy()
+        self.handler = handler 
+        self.h5path = h5path 
+        self.printit = printit
+
+        if (self.handler and self.h5path) is not None:
+            self.handler.append(self.temperature, self.h5path+'temperature')
+            self.handler.append(self.b_field, self.h5path+'bfield')
 
     @property
     def beta(self):
-        return 1/self.temperature
+        return 1.0/self.temperature
 
     def makegrid(self, x, y):
         """ 
@@ -144,39 +151,37 @@ class Ising(object):
         
     def evolve(self, iteraties):
 
-        with HDF5Handler(args.filename) as h: #FIXME: HDF5Handler shouldn't be called in evolve()
+        i = 0
+        while i < iteraties:
+            site = self.choose_site() 
+            delta_e = self.delta_energy(site) 
+            probability = self.boltzmann(delta_e) 
+            flipped = self.flip(probability, site) 
+            
+            if flipped and delta_e != 0:
+                self.total_energy = self.total_energy + delta_e
 
-            i = 0
-            while i < iteraties:
-                site = self.choose_site() 
-                delta_e = self.delta_energy(site) 
-                probability = self.boltzmann(delta_e) 
-                flipped = self.flip(probability, site) 
+                if self.handler is not None and self.h5path is not None:
+                    self.handler.append(np.array(site), self.h5path+'sites')
+                    self.handler.append(i, self.h5path+'iterations')
+                    self.handler.append(self.total_energy, self.h5path+'energy')
+                    self.handler.append(self.magnetization(), self.h5path+'magnetization')
+
+                if self.printit is not None:
+                    if i % self.printit == 0 :
+                        self.printlattice()
                 
-                if flipped and delta_e != 0:
-                    self.total_energy = self.total_energy + delta_e
-
-                    h.append(np.array(site), 'site')
-                    h.append(i, 'iteration')
-                    h.append(self.total_energy, 'energy')
-
-                    if args.printit != 0:
-                        if i % args.printit == 0 :
-                            self.printlattice()
-                    
-                i = i + 1
+            i = i + 1
 
 
     def printlattice(self):
         """
         Prints the lattice.
+
         """
-       
-        x = self.rij        
-        y = self.kolom        
         grd = self.grid
 
-        str_ising = np.empty(grd.size, dtype='int').reshape( grd.shape )
+        str_ising = np.empty(grd.size, dtype='int8').reshape( grd.shape )
         str_ising[ np.where(grd == 1) ] = 1 
         str_ising[ np.where(grd == -1) ] = 8 
         print(str_ising)
