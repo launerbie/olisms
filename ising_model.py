@@ -5,7 +5,7 @@ import numpy as np
 
 def main():
     #TODO: remove main(). 
-    i = Ising(args.x, args.y, args.bfield, args.temperature)
+    i = Ising(args.x, args.y, args.bfield, args.temperature, printit=args.printit)
     i.evolve(args.iterations)
 
 class Ising(object):
