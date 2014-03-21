@@ -113,7 +113,7 @@ class HDF5Handler(object):
             self.create_dset(dset_path, array, **kwargs)
             self.index[dset_path].append(ndarray)
 
-    def create_dset(self, dset_path, array, chunksize=1000, blockfactor=100):
+    def create_dset(self, dset_path, array, chunksize=1000, blockfactor=100, dtype='float32'):
         """
         Define h5py dataset parameters here. 
 
@@ -146,7 +146,7 @@ class HDF5Handler(object):
         chunkshape = sum(((chunksize,), arr_shape), ())
         maxshape = sum(((None,), arr_shape), ())
 
-        dsetkw = dict(chunks=chunkshape, maxshape=maxshape)
+        dsetkw = dict(chunks=chunkshape, maxshape=maxshape, dtype=dtype)
 
         init_shape = sum(((blocksize,), arr_shape), ())
         dset = self.file.create_dataset(dset_path, shape=init_shape, **dsetkw)

@@ -19,8 +19,13 @@ class Ising(object):
     
     """ 
     def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=10, 
-                 handler=None, h5path=None, printit=None):
-        self.makegrid(rij, kolom)
+                 handler=None, h5path=None, printit=None, initgrid=None):
+
+        if initgrid is not None:
+            self.grid = initgrid
+        else:
+            self.grid = self.makegrid(rij, kolom)
+
         self.rij = rij
         self.kolom = kolom
         self.shape = (rij, kolom)
@@ -34,6 +39,7 @@ class Ising(object):
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
             self.handler.append(self.b_field, self.h5path+'bfield')
+            self.handler.append(np.array(self.grid, dtype='int8'), self.h5path+'initgrid', dtype='int8')
 
     @property
     def beta(self):
@@ -46,7 +52,9 @@ class Ising(object):
         Function that makes a numpy array with x rows and y columns and fills 
         the entries randomly with '1' or '-1'
         """
-        self.grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
+        grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
+        return np.array(grid, dtype='int8')
+        
 
     def calc_energy(self): 
         """
@@ -164,8 +172,8 @@ class Ising(object):
                 self.total_energy = self.total_energy + delta_e
 
                 if self.handler is not None and self.h5path is not None:
-                    self.handler.append(np.array(site), self.h5path+'sites')
-                    self.handler.append(i, self.h5path+'iterations')
+                    self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
+                    self.handler.append(i, self.h5path+'iterations', dtype='int64')
                     self.handler.append(self.total_energy, self.h5path+'energy')
                     self.handler.append(self.magnetization(), self.h5path+'magnetization')
 
