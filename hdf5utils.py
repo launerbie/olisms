@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # name: hdf5utils.py
 
-import os
-import unittest
 import h5py
 import numpy 
 
@@ -64,24 +62,23 @@ class Dataset(object):
 
 
 class HDF5Handler(object):
+    """
+    Usage should roughly be like:
+    -----------------------------
 
+        with HDF5Handler('test.hdf5') as h:
+            while condition: #
+                h.append(ndarray, '/grp0/position')
+                h.append(ndarray, '/grp0/velocity')
+                h.append(ndarray, '/grp1/position')
+                h.append(ndarray, '/grp1/velocity')
+
+    """
     def __init__(self, filename, mode='a'):
         """
-
         Parameters
         ----------
         filename   : filename of the hdf5 file.
-
-
-        Usage should roughly be like:
-        -----------------------------
-
-            with HDF5Handler('test.hdf5') as h:
-                while condition: #
-                    h.append(ndarray, '/grp0/position')
-                    h.append(ndarray, '/grp0/velocity')
-                    h.append(ndarray, '/grp1/position')
-                    h.append(ndarray, '/grp1/velocity')
         
         """
         self.filename = filename
@@ -89,11 +86,11 @@ class HDF5Handler(object):
         self.index = dict()
 
     def __enter__(self):
-        self.file = h5py.File(self.filename, self.mode) 
+        self.file = h5py.File(self.filename, self.mode)
         return self
 
     def __exit__(self, extype, exvalue, traceback):
-        self.flushbuffers() 
+        self.flushbuffers()
         self.file.close()
         return False
 
@@ -105,11 +102,16 @@ class HDF5Handler(object):
         dset_path  : unix-style path ( 'group/datasetname' )
 
         """
-        if dset_path in self.index:
-            self.index[dset_path].append(array)
+        if is_numeric(array):
+            ndarray = convert_to_ndarray(array)
         else:
-            self.create_dset(dset_path, array, **kwargs) 
-            self.index[dset_path].append(array)
+            raise TypeError("{} is not supported".format(type(array)))
+
+        if dset_path in self.index:
+            self.index[dset_path].append(ndarray)
+        else:
+            self.create_dset(dset_path, array, **kwargs)
+            self.index[dset_path].append(ndarray)
 
     def create_dset(self, dset_path, array, chunksize=1000, blockfactor=100):
         """
@@ -134,21 +136,18 @@ class HDF5Handler(object):
         See h5py docs on chunked storage for more info.
 
         """
-        if isinstance(array, numpy.ndarray):
-            arr_shape = array.shape 
-        elif isinstance(array, list):
-            ndarray = numpy.array(list)
-            arr_shape = len(ndarray) 
+        if is_numeric(array):
+            arr_shape = get_shape(array)
         else:
-            raise TypeError("{} not supported".format(type(array)))
+            raise TypeError("{} is not supported".format(type(array)))
 
-        blocksize = blockfactor * chunksize 
+        blocksize = blockfactor * chunksize
 
         chunkshape = sum(((chunksize,), arr_shape), ())
         maxshape = sum(((None,), arr_shape), ())
 
         dsetkw = dict(chunks=chunkshape, maxshape=maxshape)
-                                       
+
         init_shape = sum(((blocksize,), arr_shape), ())
         dset = self.file.create_dataset(dset_path, shape=init_shape, **dsetkw)
         self.index.update({dset_path: Dataset(dset)})
@@ -160,154 +159,58 @@ class HDF5Handler(object):
         """
         for dset in self.index.values():
             dset.flush()
-            
 
-#TODO: move tests
-class test_HDF5Handler_ndarrays_resizable(unittest.TestCase):
-    
-    def setUp(self):
-        self.filename = 'test.hdf5'
-        self.ints = numpy.ones(123456*4).reshape(123456, 4)
-        self.floats = numpy.linspace(0, 4123, 10000*3).reshape(10000, 3)
+def convert_to_ndarray(array):
+    #TODO: this is too similar too get_shape. Rethink implementation
+    if is_scalar(array):
+        scalar = array
+        ndarray = numpy.array([scalar])
 
-        self.kwargs = dict(chunksize=1000, blockfactor=100) #choose wisely!
+    else: #convert tuple/list/ndarray
+        if isinstance(array, numpy.ndarray):
+            ndarray = array
+        elif isinstance(array, (list, tuple)):
+            ndarray = numpy.array(array)
+        else:
+            raise TypeError
 
-    def test_group_creation(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row, 'testgroup/testset', **self.kwargs)
-            self.assertTrue( isinstance(h.file['testgroup'], h5py._hl.group.Group) )
+    return ndarray
 
-    def test_hdf5file_dataset_creation(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row, 'test', **self.kwargs) 
-            self.assertTrue(isinstance(h.file['test'], h5py._hl.dataset.Dataset))
-            
-    def test_group_and_dataset_creation(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row,'testgroup/testset', **self.kwargs)
-            self.assertTrue( isinstance(h.file['testgroup/testset'], h5py._hl.dataset.Dataset) )
-            self.assertTrue( isinstance(h.file['testgroup']['testset'], h5py._hl.dataset.Dataset) )
-
-    def test_group_creation_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row, 'testgroup/testset', **self.kwargs)
-
-        f = h5py.File(self.filename)
-        self.assertTrue( isinstance(f['testgroup'], h5py._hl.group.Group) )
-        
-    def test_hdf5file_dataset_creation_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row, 'test', **self.kwargs) 
-            self.assertTrue(isinstance(h.file['test'], h5py._hl.dataset.Dataset))
-
-        f = h5py.File(self.filename)
-        self.assertTrue( isinstance(f['test'], h5py._hl.dataset.Dataset) )
-            
-    def test_group_and_dataset_creation_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row,'testgroup/testset', **self.kwargs)
-
-        f = h5py.File(self.filename)
-        self.assertTrue( isinstance(f['testgroup/testset'], h5py._hl.dataset.Dataset) )
-        self.assertTrue( isinstance(f['testgroup']['testset'], h5py._hl.dataset.Dataset) )
-
-    def test_multiple_datasets(self):
-        ndarrA =  numpy.ones(10000*3).reshape(10000, 3)
-
-        with HDF5Handler(self.filename) as h:
-            for i in range(10000):
-                h.append(ndarrA[i], 'testA', **self.kwargs) 
-                h.append(ndarrA[i], 'testB', **self.kwargs) 
-                h.append(ndarrA[i], 'testC', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(ndarrA), f['testA'].value.sum())
-        self.assertEqual(numpy.sum(ndarrA), f['testB'].value.sum())
-        self.assertEqual(numpy.sum(ndarrA), f['testC'].value.sum())
-        self.assertEqual(3, len(f.keys()) )
-   
-    def test_flushbuffers(self):
-        ndarr = numpy.ones(12345*3).reshape(12345, 3)
-
-        with HDF5Handler(self.filename) as h:
-            for row in ndarr:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(ndarr), f['test'].value.sum())
- 
-    def test_trimming(self):
-        ndarr = numpy.ones(12345*3).reshape(12345, 3)
-
-        with HDF5Handler(self.filename) as h:
-            for row in ndarr:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertEqual(ndarr.shape, f['test'].shape)
-
-    def test_flushbuffers_and_trim(self):
-        ndarr = numpy.ones(12345*3).reshape(12345, 3)
-
-        with HDF5Handler(self.filename) as h:
-            for row in ndarr:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(ndarr), f['test'].value.sum())
-        self.assertEqual(ndarr.shape, f['test'].shape)
-
-    #####################   Value tests  ####################
-
-    def test_sum_ints_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.ints:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(self.ints), f['test'].value.sum())
-
-    def test_sum_flts_almostequal6_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.floats:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertAlmostEqual(numpy.sum(self.floats), f['test'].value.sum(), places=6)
-
-    def test_sum_flts_almostequal5_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.floats:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertAlmostEqual(numpy.sum(self.floats), f['test'].value.sum(), places=5)
-
-    def test_sum_flts_almostequal4_after_closing(self):
-        with HDF5Handler(self.filename) as h:
-            for row in self.floats:
-                h.append(row, 'test', **self.kwargs) 
-
-        f = h5py.File(self.filename)
-        self.assertAlmostEqual(numpy.sum(self.floats), f['test'].value.sum(), places=4)
-
-        
-    def tearDown(self):
-        try:
-            os.remove(self.filename)
-        except OSError:
-            pass
+def get_shape(array):
+    """
+    returns shape of array or return (1,) if it is a scalar.
+    """
+    if is_scalar(array):
+        arr_shape = (1,)
+    else:
+        if isinstance(array, numpy.ndarray):
+            arr_shape = array.shape
+        elif isinstance(array, (list, tuple)):
+            #probably easiest way to determine shape of n-dimensionallists/tuples
+            ndarray = numpy.array(array)
+            arr_shape = ndarray.shape
+        else:
+            raise TypeError("shape of {} could not be determined".format(type(array)))
+    return arr_shape
 
 
-if __name__ == "__main__":
-    from colored import ColoredTextTestRunner
-    unittest.main(verbosity=2, testRunner=ColoredTextTestRunner)
+#TODO: kind of general stuff, maybe move elsewhere
+def is_numeric(number):
+    try:
+        number/1.0
+        return True
+    except TypeError as exc:
+        print(exc)
+        return False
+
+def is_scalar(array):
+    try:
+        len(array)
+        return False
+    except TypeError:
+        return True
+
+
 
 
 
