@@ -1,18 +1,13 @@
-#!/bin/usr/env python
+#!/usr/bin/env python
 
 import argparse
 import numpy as np
-import random as rnd
 from hdf5utils import HDF5Handler
-import matplotlib.pyplot as plt
 
 def main():
-
+    #TODO: remove main(). 
     i = Ising(args.x, args.y, args.bfield, args.temperature)
-#    print(i.calc_energy())
-#    i.printlattice()
     i.evolve(args.iterations)
-    i.plotevolution()
 
 class Ising(object):
     """
@@ -57,20 +52,16 @@ class Ising(object):
         grd = self.grid
 
         energy = self.b_field * self.magnetization()
-        for i in range(grd.shape[0]):
-            for j in range(grd.shape[1]):
-            
-                if i == (x - 1) and j == (y - 1):           
-                    energy = energy + grd[i][j]*grd[0][j] + grd[i][j]*grd[i][0]
-            
-                elif i == (x - 1):
-                    energy = energy + grd[i][j]*grd[0][j] + grd[i][j]*grd[i][j+1]  
-            
-                elif j == y - 1:
-                    energy = energy + grd[i][j]*grd[i+1][j] + grd[i][j]*grd[i][0]  
 
-                else:
-                    energy = energy + grd[i][j]*grd[i+1][j] + grd[i][j]*grd[i][j+1] 
+        for (i, j), value in np.ndenumerate(grd):
+            if i == (x - 1) and j == (y - 1):           
+                energy = energy + grd[i][j]*grd[0][j] + grd[i][j]*grd[i][0]
+            elif i == (x - 1):
+                energy = energy + grd[i][j]*grd[0][j] + grd[i][j]*grd[i][j+1]  
+            elif j == y - 1:
+                energy = energy + grd[i][j]*grd[i+1][j] + grd[i][j]*grd[i][0]  
+            else:
+                energy = energy + grd[i][j]*grd[i+1][j] + grd[i][j]*grd[i][j+1] 
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
 
@@ -86,47 +77,47 @@ class Ising(object):
   
     def delta_energy(self, site):
         """
-        Berekent verandering in energie als gevolg van het omdraaien van het teken (spin flip)
-        op de positie "site".
+        Berekent verandering in energie als gevolg van het omdraaien van het 
+        teken (spin flip) op de positie "site".
+
         """
- 
-        rechts = self.rij - 1  # zou eigenlijk onder moeten heten, heeft geen invloed op programma.
-        onder = self.kolom - 1  # zou eigenlijk rechts moeten heten.
+        LR = self.rij - 1  # LR: Laatste Rij Index
+        LK = self.kolom - 1  # LK: Laatste Kolom Index
         x, y = site
-        grd = self.grid
+        g = self.grid
         
-        if not (x == 0 or x == rechts or y == 0 or y == onder): # niet rand ==> midden 
-            d_energy = -grd[x][y]*(grd[x+1][y] + grd[x-1][y] + grd[x][y+1] + grd[x][y-1])
+        if not (x == 0 or x == LR or y == 0 or y == LK): # niet rand ==> midden 
+            d_energy = -g[x][y]*(g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][y-1])
 
-        else: # rand
-            if not ((x == 0 and (y == 0 or y == onder)) or (x == rechts and (y == 0 or y == onder))): # rand & niet hoek
-                if x == 0: # linkerrand
-                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[rechts][y] + grd[x][y+1] + grd[x][y-1])
+        else: #dan rand
+            if not ((x == 0 and (y == 0 or y == LK)) or (x == LR and (y == 0 or y == LK))): #dan niet hoek
+                if x == 0: 
+                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][y+1] + g[x][y-1])
 
-                elif x == rechts: # rechterrand
-                    d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][y+1] + grd[x][y-1])
+                elif x == LR: 
+                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][y+1] + g[x][y-1])
 
-                elif y == 0: # boven
-                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[x-1][y] + grd[x][y+1] + grd[x][onder])
+                elif y == 0: 
+                    d_energy = -g[x][y] * (g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][LK])
 
-                else: # onder
-                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[x-1][y] + grd[x][0] + grd[x][y-1])
+                else: 
+                    d_energy = -g[x][y] * (g[x+1][y] + g[x-1][y] + g[x][0]   + g[x][y-1])
 
-            else: # rand & hoek ==> hoek
+            else: # dan hoek
                 if (x == 0 and y == 0):
-                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[rechts][y] + grd[x][y+1] + grd[x][onder])
+                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][y+1] + g[x][LK])
 
-                elif (x == 0 and y == onder):
-                    d_energy = -grd[x][y]*(grd[x+1][y] + grd[rechts][y] + grd[x][0] + grd[x][y-1])
+                elif (x == 0 and y == LK):
+                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][0]   + g[x][y-1])
 
-                elif (x == rechts and y == 0):
-                    d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][y+1] + grd[x][onder])
+                elif (x == LR and y == 0):
+                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][y+1] + g[x][LK])
 
                 else:
-                    d_energy = -grd[x][y]*(grd[0][y] + grd[x-1][y] + grd[x][0] + grd[x][y-1])
+                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][0]   + g[x][y-1])
                 
-        return -2*d_energy + 2*self.b_field*grd[x][y] # toegevoegd: -2B*site; verandering in energie als 
-                                                     # gevolg van spin flip in extern veld van sterkte B
+        return -2*d_energy + 2*self.b_field*g[x][y]  
+
 
     def magnetization(self):
         return self.grid.sum()
@@ -136,9 +127,8 @@ class Ising(object):
 
     
     def flip(self, prob, site):
-        
         x, y = site
-        determinant = np.random.ranf() # Retruns uniform random float from range (0,1).
+        determinant = np.random.ranf() #random flt from uniform distr (0,1).
     
         if prob >= 1:
             self.grid[x][y] = -self.grid[x][y]
@@ -156,47 +146,25 @@ class Ising(object):
 
         with HDF5Handler(args.filename) as h: #FIXME: HDF5Handler shouldn't be called in evolve()
 
-            energy_as_function_of_time = [] #TODO: remove when plotting module is ready
             i = 0
             while i < iteraties:
                 site = self.choose_site() 
-                delta_e = self.delta_energy(site) # calculate energy change if that spin were flipped
+                delta_e = self.delta_energy(site) 
                 probability = self.boltzmann(delta_e) 
-                flipped = self.flip(probability, site) # flip spin with probability exp(-beta*delta_e)
-                                                       # and return boolean indicating if flipped.
+                flipped = self.flip(probability, site) 
                 
                 if flipped and delta_e != 0:
                     self.total_energy = self.total_energy + delta_e
 
                     h.append(np.array(site), 'site')
-                    h.append(np.array(i), 'iteration')
-                    h.append(np.array(self.total_energy), 'energy')
+                    h.append(i, 'iteration')
+                    h.append(self.total_energy, 'energy')
 
                     if args.printit != 0:
                         if i % args.printit == 0 :
                             self.printlattice()
                     
-                energy_as_function_of_time.append(self.total_energy) #TODO: remove when plotting module is ready
                 i = i + 1
-
-        #TODO: remove next two lines when plotting module is ready
-        self.time_variable = np.arange(iteraties) # For plotting E(t). This array will be the time axis
-        self.energy_variable = np.array(energy_as_function_of_time) # For plotting E(t). This array will be the energy axis
-
-    def plotevolution(self):
-        """
-        Makes a plot of total system energy as a funtion of time (iterations) based on the data collected in 
-        the function "evolve". The plot is saved under the name "evolution.png"
-        """
-
-        E = self.energy_variable
-        t = self.time_variable
-
-        fig = plt.figure(figsize=(20,4))
-        ax = fig.add_subplot(111)
-
-        ax.plot(t, E)
-        plt.savefig("evolution")
 
 
     def printlattice(self):
@@ -221,13 +189,18 @@ def get_arguments():
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-T', '--temperature', default=0.001, type=float, help="The Temperature") 
-    parser.add_argument('-i', '--iterations', default=100000, type=int, help="Number of iterations, default: 100000") 
-    parser.add_argument('-b', '--bfield', default=0.00, type=float, help="Uniform external magnetic field, default: 0") 
-    parser.add_argument('-y', default=40,type=int, help="number of collumns (width)") 
-    parser.add_argument('-x', default=40,type=int, help="number of rows (height)") 
-    parser.add_argument('-f', '--filename', default='test.hdf5', help="hdf5 output file name") 
-    parser.add_argument('-p', '--printit', default=0,type=int, help="print lattice every p flips") 
+    parser.add_argument('-T', '--temperature', default=0.001, type=float,
+                        help="The Temperature") 
+    parser.add_argument('-i', '--iterations', default=100000, type=int,
+                        help="Number of iterations, default: 100000") 
+    parser.add_argument('-b', '--bfield', default=0.00, type=float,
+                        help="Uniform external magnetic field, default: 0") 
+    parser.add_argument('-y', default=40,type=int,help="number of columns") 
+    parser.add_argument('-x', default=40,type=int, help="number of rows") 
+    parser.add_argument('-f', '--filename', default='test.hdf5', 
+                        help="hdf5 output file name") 
+    parser.add_argument('-p', '--printit', default=0,type=int,
+                        help="print lattice every p flips") 
 
     args = parser.parse_args()
     return args
