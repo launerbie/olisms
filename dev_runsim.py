@@ -5,7 +5,7 @@ import os
 import argparse
 import numpy
 
-from ising_model import Ising
+from dev_ising_model import Ising
 from hdf5utils import HDF5Handler
 
 
