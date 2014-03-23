@@ -39,7 +39,8 @@ class Ising(object):
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
             self.handler.append(self.b_field, self.h5path+'bfield')
-            self.handler.append(np.array(self.grid, dtype='int8'), self.h5path+'initgrid', dtype='int8')
+            self.handler.append(np.array(self.grid, dtype='int8'), 
+                                self.h5path+'initgrid', dtype='int8')
 
     @property
     def beta(self):
@@ -59,6 +60,15 @@ class Ising(object):
     def boltzmann(self, delta_energy):
         return np.exp(-self.beta*delta_energy) 
 
+    def choose_site(self):
+        """
+        Randomly chooses site to flip
+        """
+        #TODO: 3D array
+        site_x = np.random.randint(0,self.rij)
+        site_y = np.random.randint(0,self.kolom)
+        
+        return site_x, site_y
 
     def makegrid(self, x, y):
         """ 
@@ -70,8 +80,7 @@ class Ising(object):
         
     def neighbors(self, site, boundary='periodic'):
         """
-        TODO: maybe this function can be used in delta_energy in the metropolis algorithm?
-        TODO: return neighbors based on boundary.
+        TODO: return neighbors based on boundary argument.
       
         Returns a list of sites which are the neighbors of 'site' based on
         the boundary condition.
@@ -114,7 +123,8 @@ class Ising(object):
         if not (i == 0 or i == LR or j == 0 or j == LK): # dan niet rand  
             nbrs = (i+1, j), (i-1, j), (i, j+1), (i, j-1)
         else: #dan rand
-            if not ((i == 0 and (j == 0 or j == LK)) or (i == LR and (j == 0 or j == LK))): #dan niet hoek
+            if not ((i == 0 and (j == 0 or j == LK)) or\
+                    (i == LR and (j == 0 or j == LK))): #dan niet hoek
                 if i == 0:
                     nbrs = (i+1, j), (LR, j), (i, j+1), (i, j-1)
                 elif i == LR:
@@ -144,86 +154,38 @@ class Ising(object):
 
         """
         g = self.grid
-
         energy = self.b_field * self.magnetization()
 
         for site, value in np.ndenumerate(g):
-            nbrs = self.neighbors(site)
-
-            right_nbr = nbrs[2]
-            below_nbr = nbrs[0]
-            
-            energy = energy + g[site]*( g[right_nbr] + g[below_nbr] )
+            below, above, right, left = self.neighbors(site)
+            energy = energy + g[site]*( g[right] + g[below] )
 
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
 
-    def choose_site(self):
-        """
-        Randomly chooses site to flip
-        """
-        #TODO: 3D array
-        site_x = np.random.randint(0,self.rij)
-        site_y = np.random.randint(0,self.kolom)
-        
-        return site_x, site_y
-  
     def delta_energy(self, site):
         """
         Berekent verandering in energie als gevolg van het omdraaien van het 
         teken (spin flip) op de positie "site".
 
         """
-        LR = self.rij - 1  # LR: Laatste Rij Index
-        LK = self.kolom - 1  # LK: Laatste Kolom Index
-        x, y = site
         g = self.grid
-        
-
-        if not (x == 0 or x == LR or y == 0 or y == LK): # niet rand ==> midden 
-            d_energy = -g[x][y]*(g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][y-1])
-
-        else: #dan rand
-            if not ((x == 0 and (y == 0 or y == LK)) or (x == LR and (y == 0 or y == LK))): #dan niet hoek
-                if x == 0: 
-                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][y+1] + g[x][y-1])
-
-                elif x == LR: 
-                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][y+1] + g[x][y-1])
-
-                elif y == 0: 
-                    d_energy = -g[x][y] * (g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][LK])
-
-                else: 
-                    d_energy = -g[x][y] * (g[x+1][y] + g[x-1][y] + g[x][0]   + g[x][y-1])
-
-            else: # dan hoek
-                if (x == 0 and y == 0):
-                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][y+1] + g[x][LK])
-
-                elif (x == 0 and y == LK):
-                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][0]   + g[x][y-1])
-
-                elif (x == LR and y == 0):
-                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][y+1] + g[x][LK])
-
-                else:
-                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][0]   + g[x][y-1])
-                
-        return -2*d_energy + 2*self.b_field*g[x][y]  
+        below, above, right, left = self.neighbors(site)
+        d_energy = -g[site] * (g[below] + g[above] +g[right] +g[left])
+        return -2*d_energy + 2*self.b_field*g[site]  
 
     
     def flip(self, prob, site):
-        x, y = site
+        """ Flip 'site' with probability 'prob'."""
         determinant = np.random.ranf() #random flt from uniform distr (0,1).
-    
+
         if prob >= 1:
-            self.grid[x][y] = -self.grid[x][y]
+            self.grid[site] = -self.grid[site]
             return True
 
         else:
             if determinant <= prob:                     
-                self.grid[x][y] = -self.grid[x][y]
+                self.grid[site] = -self.grid[site]
                 return True
             else:
                 return False
@@ -258,7 +220,7 @@ class Ising(object):
 
     def ewolve(self, iterations):
         """
-        Evolve it using Wolff's algorithm.
+        Ewolve it using Wolff's algorithm.
         """
         g = self.grid
 
