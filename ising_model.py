@@ -47,6 +47,19 @@ class Ising(object):
         kB = 1
         return 1.0/(kB*self.temperature)
 
+    @property
+    def bond_probability(self):
+        J = 1
+        kB =1
+        return 1 - np.exp(-2*J/(kB*self.temperature))
+
+    def magnetization(self):
+        return self.grid.sum()
+
+    def boltzmann(self, delta_energy):
+        return np.exp(-self.beta*delta_energy) 
+
+
     def makegrid(self, x, y):
         """ 
         Function that makes a numpy array with x rows and y columns and fills 
@@ -55,6 +68,72 @@ class Ising(object):
         grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
         return np.array(grid, dtype='int8')
         
+    def neighbors(self, site, boundary='periodic'):
+        """
+        TODO: maybe this function can be used in delta_energy in the metropolis algorithm?
+        TODO: return neighbors based on boundary.
+      
+        Returns a list of sites which are the neighbors of 'site' based on
+        the boundary condition.
+
+        Return
+        ------
+        tuple: (below nbr), (above nbr), (right nbr), (left nbr)
+        
+        Here: "below", "above", "right" and "left" mean:
+
+                   j-1         j         j+1
+
+                ---------------------------------
+        i-1     |        |    above   |         |
+                |        |            |         |
+                ---------------------------------
+         i      |  left  |    site    |  right  |
+                |        |   (i, j)   |         |
+                ---------------------------------
+        i+1     |        |            |         |
+                |        |    below   |         |
+                ---------------------------------
+
+
+        So if you consider the ndarray a=numpy.arange(9).reshape(3,3):
+
+                >>> a
+                array([[0, 1, 2],
+                       [3, 4, 5],
+                       [6, 7, 8]])
+                >>> print(a[0,0], a[1,1], a[2,2])
+                0 4 8
+
+        Then the left neighbor of 4 is 3.
+
+        """
+        LR = self.rij - 1
+        LK = self.kolom - 1
+        i, j = site
+        if not (i == 0 or i == LR or j == 0 or j == LK): # dan niet rand  
+            nbrs = (i+1, j), (i-1, j), (i, j+1), (i, j-1)
+        else: #dan rand
+            if not ((i == 0 and (j == 0 or j == LK)) or (i == LR and (j == 0 or j == LK))): #dan niet hoek
+                if i == 0:
+                    nbrs = (i+1, j), (LR, j), (i, j+1), (i, j-1)
+                elif i == LR:
+                    nbrs = (0, j), (i-1, j), (i, j+1), (i, j-1)
+                elif j == 0:
+                    nbrs = (i+1, j), (i-1, j), (i, j+1), (i, LK)
+                else:
+                    nbrs = (i+1, j), (i-1, j), (i, 0), (i, j-1)
+            else: # dan hoek
+                if (i == 0 and j == 0):
+                    nbrs = (i+1, j), (LR, j), (i, j+1), (i, LK)
+                elif (i == 0 and j == LK):
+                    nbrs = (i+1, j), (LR, j), (i, 0), (i, j-1)
+                elif (i == LR and j == 0):
+                    nbrs = (0, j), (i-1, j), (i, j+1), (i, LK)
+                else:
+                    nbrs = (0, j), (i-1, j), (i, 0), (i, j-1)
+        return nbrs
+
 
     def calc_energy(self): 
         """
@@ -64,21 +143,18 @@ class Ising(object):
         first in column (torus).
 
         """
-        x = self.rij        
-        y = self.kolom        
-        grd = self.grid
+        g = self.grid
 
         energy = self.b_field * self.magnetization()
 
-        for (i, j), value in np.ndenumerate(grd):
-            if i == (x - 1) and j == (y - 1):           
-                energy = energy + grd[i][j]*grd[0][j] + grd[i][j]*grd[i][0]
-            elif i == (x - 1):
-                energy = energy + grd[i][j]*grd[0][j] + grd[i][j]*grd[i][j+1]  
-            elif j == y - 1:
-                energy = energy + grd[i][j]*grd[i+1][j] + grd[i][j]*grd[i][0]  
-            else:
-                energy = energy + grd[i][j]*grd[i+1][j] + grd[i][j]*grd[i][j+1] 
+        for site, value in np.ndenumerate(g):
+            nbrs = self.neighbors(site)
+
+            right_nbr = nbrs[2]
+            below_nbr = nbrs[0]
+            
+            energy = energy + g[site]*( g[right_nbr] + g[below_nbr] )
+
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
 
@@ -103,6 +179,7 @@ class Ising(object):
         x, y = site
         g = self.grid
         
+
         if not (x == 0 or x == LR or y == 0 or y == LK): # niet rand ==> midden 
             d_energy = -g[x][y]*(g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][y-1])
 
@@ -135,13 +212,6 @@ class Ising(object):
                 
         return -2*d_energy + 2*self.b_field*g[x][y]  
 
-
-    def magnetization(self):
-        return self.grid.sum()
-
-    def boltzmann(self, delta_energy):
-        return np.exp(-self.beta*delta_energy) 
-
     
     def flip(self, prob, site):
         x, y = site
@@ -160,7 +230,9 @@ class Ising(object):
 
         
     def evolve(self, iteraties):
-
+        """
+        Evolve it using Metropolis.
+        """
         i = 0
         while i < iteraties:
             site = self.choose_site() 
@@ -183,6 +255,56 @@ class Ising(object):
                 
             i = i + 1
 
+
+    def ewolve(self, iterations):
+        """
+        Evolve it using Wolff's algorithm.
+        """
+        g = self.grid
+
+        i=0
+        while i < iterations:
+            self.total_energy = self.calc_energy()
+
+            if args.verbose is True:
+                self.printlattice()
+                print("Clusters flipped : {}".format(i))
+                print("Temperature      : {}".format(self.temperature))
+                print("Bond Probability : {}".format(self.bond_probability))
+
+            cluster = list()
+            perimeter_spins = list()
+
+            seed = self.choose_site()
+            seed_spin = g[seed]
+            cluster.append(seed)
+
+            nbrs = self.neighbors(seed)
+
+            for nbr in nbrs:
+                if seed_spin == g[nbr]:
+                    perimeter_spins.append(nbr)
+
+            while len(perimeter_spins) != 0:
+
+                site_to_test = perimeter_spins[0]
+                perimeter_spins.pop(0)
+
+                if seed_spin == g[site_to_test]:
+                    determinant = np.random.ranf()
+
+                    if determinant <= self.bond_probability: #then add to cluster
+                        cluster.append(site_to_test)
+
+                        nbrs = self.neighbors(site_to_test)
+                        for nbr in nbrs:
+                            if nbr not in cluster and nbr not in perimeter_spins:
+                                perimeter_spins.append(nbr)
+
+            #flip cluster
+            g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
+
+            i += 1
 
     def printlattice(self):
         """
@@ -210,6 +332,7 @@ def get_arguments():
                         help="Number of iterations, default: 100000") 
     parser.add_argument('-b', '--bfield', default=0.00, type=float,
                         help="Uniform external magnetic field, default: 0") 
+    parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-y', default=40,type=int,help="number of columns") 
     parser.add_argument('-x', default=40,type=int, help="number of rows") 
     parser.add_argument('-f', '--filename', default='test.hdf5', 
