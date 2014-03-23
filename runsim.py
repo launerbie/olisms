@@ -37,13 +37,18 @@ def simulate():
 
 
     """
-    temperatures = numpy.linspace(0.0001, 1000, 2)
+    Tmin = args.tmin
+    Tmax = args.tmax
+    steps = args.steps
+    
+    temperatures = numpy.linspace(Tmin, Tmax, steps)
 
     with HDF5Handler(args.filename) as handler:
         simcount = 0
+        indexwidth = len(str(steps))
         for T in temperatures:
             print(T)
-            sim_str = str(simcount).zfill(3)
+            sim_str = str(simcount).zfill(indexwidth)
             h5path = "/"+"sim_"+sim_str+"/"
             i = Ising(args.x, args.y, temperature=T, handler=handler, 
                       h5path=h5path)
@@ -70,6 +75,11 @@ def get_arguments():
     parser.add_argument('-x', default=40, type=int, help="number of rows")
     parser.add_argument('-f', '--filename', required=True,
                         help="hdf5 output file name")
+
+    parser.add_argument('--tmin', default=0.001, type=float)
+    parser.add_argument('--tmax', default=1000, type=float)
+    parser.add_argument('--steps', default=5, type=float)
+
 
     args = parser.parse_args()
     return args
