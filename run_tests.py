@@ -158,8 +158,7 @@ class test_magnetization(unittest.TestCase):
 
     def test_magnetization(self):
         I = self.ising
-
-        self.assertEqual(I.magnetization(), 3)
+        self.assertEqual(I.magnetization, 3)
 
 
 

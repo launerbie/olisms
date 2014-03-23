@@ -1,25 +1,43 @@
 #!/usr/bin/env python
 
+import shutil
 import argparse
 import numpy as np
 
 def main():
     #TODO: remove main(). 
-    i = Ising(args.x, args.y, args.bfield, args.temperature, printit=args.printit)
+    if args.full:
+        args.x = screensize.lines - 8 
+        args.y = (screensize.columns//2) -2
+    
+    i = Ising(args.x, args.y, args.bfield, args.temperature, 
+              printit=args.printit, mode=args.mode)
+
     i.evolve(args.iterations)
 
 class Ising(object):
-    """
-    Parameters
-    ----------
-    rij : number of rows in lattice
-    kolom: number of columns in lattice
-    b_field: strength of the uniform b-field
-    temperature: temperature 
-    
-    """ 
     def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=10, 
-                 handler=None, h5path=None, printit=None, initgrid=None):
+                 handler=None, h5path=None, printit=None, initgrid=None,
+                 mode='metropolis'):
+        """ 
+        Parameters
+        ----------
+        rij : number of rows in lattice
+        kolom: number of columns in lattice
+        b_field: strength of the uniform b-field
+        temperature: temperature 
+        handler: HDF5Handler instance
+        h5path: unix-style path, used as address in the hdf5 file
+        initgrid: set an initial ndarray as grid
+        mode : algorithm to use. Choices are: ['metropolis', 'wolff']
+    
+        """
+        if mode == 'metropolis':
+            self.evolve = self.evolve_metropolis
+        elif mode == 'wolff':
+            self.evolve = self.evolve_wolff
+        else:
+            raise ValueError("Unknown mode")
 
         if initgrid is not None:
             self.grid = initgrid
@@ -54,6 +72,7 @@ class Ising(object):
         kB =1
         return 1 - np.exp(-2*J/(kB*self.temperature))
 
+    @property
     def magnetization(self):
         return self.grid.sum()
 
@@ -154,7 +173,7 @@ class Ising(object):
 
         """
         g = self.grid
-        energy = self.b_field * self.magnetization()
+        energy = self.b_field * self.magnetization
 
         for site, value in np.ndenumerate(g):
             below, above, right, left = self.neighbors(site)
@@ -191,34 +210,44 @@ class Ising(object):
                 return False
 
         
-    def evolve(self, iteraties):
+    def evolve_metropolis(self, iterations):
         """
         Evolve it using Metropolis.
         """
         i = 0
-        while i < iteraties:
+        flipcount = 0
+        while i < iterations:
             site = self.choose_site() 
             delta_e = self.delta_energy(site) 
             probability = self.boltzmann(delta_e) 
             flipped = self.flip(probability, site) 
             
             if flipped and delta_e != 0:
+                flipcount += 1 
+
                 self.total_energy = self.total_energy + delta_e
 
-                if self.printit is not None:
-                    if i % self.printit == 0 :
-                        self.printlattice()
+            if self.printit is not None:
+                if i % self.printit == 0 :
+                    self.printlattice()
+                    print("Temperature    : {}".format(self.temperature))
+                    print("B-Field        : {}".format(self.b_field))
+                    print("Iterations     : {}".format(i))
+                    print("Energy         : {}".format(self.total_energy))
+                    print("Magnetization  : {}".format(self.magnetization))
+                    print("flips/iters    : {}/{}".format(flipcount, i))
+                    print("x/y    : {}/{}".format(self.rij, self.kolom))
 
             if self.handler is not None and self.h5path is not None:
                 self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
                 self.handler.append(i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
-                self.handler.append(self.magnetization(), self.h5path+'magnetization')
-                
+                self.handler.append(self.magnetization, self.h5path+'magnetization')
+
             i = i + 1
 
 
-    def ewolve(self, iterations):
+    def evolve_wolff(self, iterations):
         """
         Ewolve it using Wolff's algorithm.
         """
@@ -228,14 +257,8 @@ class Ising(object):
         while i < iterations:
             self.total_energy = self.calc_energy()
 
-            if args.verbose is True:
-                self.printlattice()
-                print("Clusters flipped : {}".format(i))
-                print("Temperature      : {}".format(self.temperature))
-                print("Bond Probability : {}".format(self.bond_probability))
-
             cluster = list()
-            perimeter_spins = list()
+            perimeter = list()
 
             seed = self.choose_site()
             seed_spin = g[seed]
@@ -245,41 +268,53 @@ class Ising(object):
 
             for nbr in nbrs:
                 if seed_spin == g[nbr]:
-                    perimeter_spins.append(nbr)
+                    perimeter.append(nbr)
 
-            while len(perimeter_spins) != 0:
+            while len(perimeter) != 0:
 
-                site_to_test = perimeter_spins[0]
-                perimeter_spins.pop(0)
+                site_to_test = perimeter[0]
+                perimeter.pop(0)
 
                 if seed_spin == g[site_to_test]:
                     determinant = np.random.ranf()
 
-                    if determinant <= self.bond_probability: #then add to cluster
+                    if determinant <= self.bond_probability: 
                         cluster.append(site_to_test)
 
                         nbrs = self.neighbors(site_to_test)
                         for nbr in nbrs:
-                            if nbr not in cluster and nbr not in perimeter_spins:
-                                perimeter_spins.append(nbr)
+                            if nbr not in cluster and nbr not in perimeter:
+                                perimeter.append(nbr)
 
             #flip cluster
             g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
 
+            if self.printit is not None:
+                if i % self.printit == 0 :
+                    self.printlattice()
+                    print("Temperature      : {}".format(self.temperature))
+                    print("B-Field          : {}".format(self.b_field))
+                    print("Bond Probability : {}".format(self.bond_probability))
+                    print("Iterations       : {}".format(i))
+                    print("Energy           : {}".format(self.total_energy))
+                    print("Magnetization    : {}".format(self.magnetization))
+                    print("x/y    : {}/{}".format(self.rij, self.kolom))
+
+            if self.handler is not None and self.h5path is not None:
+                self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
+                self.handler.append(i, self.h5path+'iterations', dtype='int64')
+                self.handler.append(self.total_energy, self.h5path+'energy')
+                self.handler.append(self.magnetization, self.h5path+'magnetization')
+
             i += 1
 
     def printlattice(self):
-        """
-        Prints the lattice.
-
-        """
-        grd = self.grid
-
-        str_ising = np.empty(grd.size, dtype='int8').reshape( grd.shape )
-        str_ising[ np.where(grd == 1) ] = 1 
-        str_ising[ np.where(grd == -1) ] = 8 
+        """ Prints the lattice. """
+        g = self.grid
+        str_ising = np.empty(g.size, dtype='int8').reshape(g.shape)
+        str_ising[ np.where(g == 1) ] = 1 
+        str_ising[ np.where(g == -1) ] = 8 
         print(str_ising)
-        print("\n")
 
 def get_arguments():
     """
@@ -288,19 +323,22 @@ def get_arguments():
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-T', '--temperature', default=0.001, type=float,
-                        help="The Temperature") 
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000") 
+    parser.add_argument('-T', '--temperature', default=0.001, type=float,
+                        help="The Temperature") 
     parser.add_argument('-b', '--bfield', default=0.00, type=float,
                         help="Uniform external magnetic field, default: 0") 
-    parser.add_argument('-v', '--verbose', action='store_true')
-    parser.add_argument('-y', default=40,type=int,help="number of columns") 
+    parser.add_argument('-y', default=40,type=int, help="number of columns") 
     parser.add_argument('-x', default=40,type=int, help="number of rows") 
-    parser.add_argument('-f', '--filename', default='test.hdf5', 
-                        help="hdf5 output file name") 
-    parser.add_argument('-p', '--printit', default=0,type=int,
-                        help="print lattice every p flips") 
+    parser.add_argument('-p', '--printit', default=None, type=int,
+                        help="Print lattice every p flips") 
+    parser.add_argument('--mode', default='metropolis', choices=['metropolis','wolff'],
+                        help="Evolve with this algorithm.") 
+   
+    parser.add_argument('--full', action='store_true', help="Set lattice size\
+                        such that it fills the terminal screen")
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args()
     return args
@@ -308,8 +346,8 @@ def get_arguments():
 
 if __name__ == "__main__":
     args = get_arguments()
-    #TODO: get maximum linewidth available in terminal and set this in np.set_printoptions
-    np.set_printoptions(threshold=np.nan, linewidth= 300)
+    screensize = shutil.get_terminal_size(fallback=(80, 80))
+    np.set_printoptions(threshold=np.nan, linewidth= 340)
     print(args)
     main()
 
