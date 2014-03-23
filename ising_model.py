@@ -171,15 +171,15 @@ class Ising(object):
             if flipped and delta_e != 0:
                 self.total_energy = self.total_energy + delta_e
 
-                if self.handler is not None and self.h5path is not None:
-                    self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
-                    self.handler.append(i, self.h5path+'iterations', dtype='int64')
-                    self.handler.append(self.total_energy, self.h5path+'energy')
-                    self.handler.append(self.magnetization(), self.h5path+'magnetization')
-
                 if self.printit is not None:
                     if i % self.printit == 0 :
                         self.printlattice()
+
+            if self.handler is not None and self.h5path is not None:
+                self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
+                self.handler.append(i, self.h5path+'iterations', dtype='int64')
+                self.handler.append(self.total_energy, self.h5path+'energy')
+                self.handler.append(self.magnetization(), self.h5path+'magnetization')
                 
             i = i + 1
 

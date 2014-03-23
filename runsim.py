@@ -37,7 +37,7 @@ def simulate():
 
 
     """
-    temperatures = numpy.linspace(0.001, 1, 20)
+    temperatures = numpy.linspace(0.0001, 1000, 2)
 
     with HDF5Handler(args.filename) as handler:
         simcount = 0
