@@ -161,43 +161,42 @@ class test_magnetization(unittest.TestCase):
         self.assertEqual(I.magnetization, 3)
 
 
-
 class test_HDF5Handler_ndarrays(unittest.TestCase):
     def setUp(self):
         self.Handler = HDF5Handler
         self.filename = 'test.hdf5'
 
-        self.ints1d = numpy.ones(12345*4)
-        self.floats1d = numpy.linspace(0, 4123, 10000*3)
-        self.ints = numpy.ones(12345*4).reshape(12345, 4)
-        self.floats = numpy.linspace(0, 4123, 10000*3).reshape(10000, 3)
+        self.ints1d = numpy.ones(12345*2)
+        self.floats1d = numpy.linspace(0, 4123, 10000*2)
+        self.ints = numpy.ones(12345*2).reshape(12345, 2)
+        self.floats = numpy.linspace(0, 4123, 10000*2).reshape(10000, 2)
 
         self.sumints1d = numpy.sum(self.ints1d)
         self.sumfloats1d = numpy.sum(self.floats1d)
         self.sumints = numpy.sum(self.ints)
         self.sumfloats = numpy.sum(self.floats)
 
-        #TODO: write a benchmark module to test differen shapes
+        #TODO: write a benchmark module to test different shapes
         self.kwargs = dict(chunksize=1000, blockfactor=100) #choose wisely!
 
     def test_group_creation(self):
         with self.Handler(self.filename) as h:
             for row in self.ints:
                 h.append(row, 'testgroup/testset')
-            self.assertTrue( isinstance(h.file['testgroup'], h5py._hl.group.Group) )
+            self.assertTrue( isinstance(h.file['testgroup'], h5py.Group) )
 
     def test_hdf5file_dataset_creation(self):
         with self.Handler(self.filename) as h:
             for row in self.ints:
                 h.append(row, 'test') 
-            self.assertTrue(isinstance(h.file['test'], h5py._hl.dataset.Dataset))
+            self.assertTrue(isinstance(h.file['test'], h5py.Dataset))
             
     def test_group_and_dataset_creation(self):
         with self.Handler(self.filename) as h:
             for row in self.ints:
                 h.append(row,'testgroup/testset')
-            self.assertTrue( isinstance(h.file['testgroup/testset'], h5py._hl.dataset.Dataset) )
-            self.assertTrue( isinstance(h.file['testgroup']['testset'], h5py._hl.dataset.Dataset) )
+            self.assertTrue( isinstance(h.file['testgroup/testset'], h5py.Dataset) )
+            self.assertTrue( isinstance(h.file['testgroup']['testset'], h5py.Dataset) )
 
     def test_group_creation_after_closing(self):
         with self.Handler(self.filename) as h:
@@ -205,16 +204,16 @@ class test_HDF5Handler_ndarrays(unittest.TestCase):
                 h.append(row, 'testgroup/testset')
 
         f = h5py.File(self.filename)
-        self.assertTrue( isinstance(f['testgroup'], h5py._hl.group.Group) )
+        self.assertTrue( isinstance(f['testgroup'], h5py.Group) )
         
     def test_hdf5file_dataset_creation_after_closing(self):
         with self.Handler(self.filename) as h:
             for row in self.ints:
                 h.append(row, 'test') 
-            self.assertTrue(isinstance(h.file['test'], h5py._hl.dataset.Dataset))
+            self.assertTrue(isinstance(h.file['test'], h5py.Dataset))
 
         f = h5py.File(self.filename)
-        self.assertTrue( isinstance(f['test'], h5py._hl.dataset.Dataset) )
+        self.assertTrue( isinstance(f['test'], h5py.Dataset) )
             
     def test_group_and_dataset_creation_after_closing(self):
         with self.Handler(self.filename) as h:
@@ -222,54 +221,74 @@ class test_HDF5Handler_ndarrays(unittest.TestCase):
                 h.append(row,'testgroup/testset')
 
         f = h5py.File(self.filename)
-        self.assertTrue( isinstance(f['testgroup/testset'], h5py._hl.dataset.Dataset) )
-        self.assertTrue( isinstance(f['testgroup']['testset'], h5py._hl.dataset.Dataset) )
+        self.assertTrue( isinstance(f['testgroup/testset'], h5py.Dataset) )
+        self.assertTrue( isinstance(f['testgroup']['testset'], h5py.Dataset) )
 
-    def test_multiple_datasets(self):
-        ndarrA =  numpy.ones(10000*3).reshape(10000, 3)
-
+    def test_creation_multiple_datasets(self):
         with self.Handler(self.filename) as h:
-            for i in range(10000):
-                h.append(ndarrA[i], 'testA') 
-                h.append(ndarrA[i], 'testB') 
-                h.append(ndarrA[i], 'testC') 
+            for row in self.ints:
+                h.append(row, 'testA') 
+                h.append(row, 'testB') 
+                h.append(row, 'testC') 
+            self.assertTrue(isinstance(h.file['testA'], h5py.Dataset) )
+            self.assertTrue(isinstance(h.file['testB'], h5py.Dataset) )
+            self.assertTrue(isinstance(h.file['testC'], h5py.Dataset) )
+            self.assertEqual(3, len(h.file.keys()) )
+
+    def test_creation_multiple_datasets_after_closing(self):
+        with self.Handler(self.filename) as h:
+            for row in self.ints:
+                h.append(row, 'testA') 
+                h.append(row, 'testB') 
+                h.append(row, 'testC') 
 
         f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(ndarrA), f['testA'].value.sum())
-        self.assertEqual(numpy.sum(ndarrA), f['testB'].value.sum())
-        self.assertEqual(numpy.sum(ndarrA), f['testC'].value.sum())
+        self.assertTrue(isinstance(f['testA'], h5py.Dataset) )
+        self.assertTrue(isinstance(f['testB'], h5py.Dataset) )
+        self.assertTrue(isinstance(f['testC'], h5py.Dataset) )
         self.assertEqual(3, len(f.keys()) )
    
     def test_flushbuffers(self):
-        ndarr = numpy.ones(12345*3).reshape(12345, 3)
-
         with self.Handler(self.filename) as h:
-            for row in ndarr:
+            for row in self.ints:
                 h.append(row, 'test') 
 
         f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(ndarr), f['test'].value.sum())
+        self.assertEqual(self.sumints, f['test'].value.sum())
  
     def test_trimming(self):
-        ndarr = numpy.ones(12345*3).reshape(12345, 3)
-
         with self.Handler(self.filename) as h:
-            for row in ndarr:
+            for row in self.ints:
                 h.append(row, 'test') 
 
         f = h5py.File(self.filename)
-        self.assertEqual(ndarr.shape, f['test'].shape)
+        self.assertEqual(self.ints.shape, f['test'].shape)
 
     def test_flushbuffers_and_trim(self):
-        ndarr = numpy.ones(12345*3).reshape(12345, 3)
-
         with self.Handler(self.filename) as h:
-            for row in ndarr:
+            for row in self.ints:
                 h.append(row, 'test') 
 
         f = h5py.File(self.filename)
-        self.assertEqual(numpy.sum(ndarr), f['test'].value.sum())
-        self.assertEqual(ndarr.shape, f['test'].shape)
+        self.assertEqual(self.sumints, f['test'].value.sum())
+        self.assertEqual(self.ints.shape, f['test'].shape)
+
+    def test_shape_scalars(self):
+        with self.Handler(self.filename) as h:
+            for row in self.ints1d:
+                h.append(row, 'test') 
+
+        f = h5py.File(self.filename)
+        self.assertEqual(self.ints1d.shape, f['test'].shape)
+
+    def test_shape_arrays(self):
+        with self.Handler(self.filename) as h:
+            for row in self.ints:
+                h.append(row, 'test') 
+
+        f = h5py.File(self.filename)
+        self.assertEqual(self.ints.shape, f['test'].shape)
+        
 
     #####################   Value tests  ####################
 
@@ -405,6 +424,16 @@ class test_HDF5Handler_ndarrays(unittest.TestCase):
 
         f = h5py.File(self.filename)
         self.assertAlmostEqual(self.sumfloats, f['test'].value.sum(), places=1)
+
+    def test_prefix(self):
+        with self.Handler(self.filename) as h:
+            h.prefix = 'prefix/'
+            for row in self.ints:
+                h.append(row, 'test') 
+
+        f = h5py.File(self.filename)
+        self.assertEqual(self.sumints, f['prefix/test'].value.sum())
+
         
     def tearDown(self):
         try:
