@@ -11,13 +11,13 @@ def main():
         args.y = (screensize.columns//2) -2
     
     i = Ising(args.x, args.y, args.bfield, args.temperature, 
-              printit=args.printit, mode=args.mode)
+              printit=args.printit, mode=args.mode, aligned=args.aligned)
 
     i.evolve(args.iterations)
 
 class Ising(object):
     def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=10, 
-                 handler=None, h5path=None, printit=None, initgrid=None,
+                 handler=None, h5path=None, printit=None, aligned=False,
                  mode='metropolis'):
         """ 
         Parameters
@@ -39,10 +39,7 @@ class Ising(object):
         else:
             raise ValueError("Unknown mode")
 
-        if initgrid is not None:
-            self.grid = initgrid
-        else:
-            self.grid = self.makegrid(rij, kolom)
+        self.grid = self.makegrid(rij, kolom, aligned=aligned)
 
         self.rij = rij
         self.kolom = kolom
@@ -53,31 +50,44 @@ class Ising(object):
         self.handler = handler 
         self.h5path = h5path 
         self.printit = printit
+        self.ptable = self.make_probability_table()
+        
 
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
-            self.handler.append(self.b_field, self.h5path+'bfield')
+            #self.handler.append(self.b_field, self.h5path+'bfield')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
 
-    @property
-    def beta(self):
-        #kB = 1.3806488e-23 J K^-1
-        kB = 1
-        return 1.0/(kB*self.temperature)
+    def make_probability_table(self):
+        delta_energies = [-8, -4, 0, 4, 8] #TODO: un-hardcode
+        ptable = dict() 
+        for dE in delta_energies:
+            ptable.update({dE:np.exp(-dE/self.temperature)}) 
+        return ptable
 
-    @property
-    def bond_probability(self):
-        J = 1
-        kB =1
-        return 1 - np.exp(-2*J/(kB*self.temperature))
+
+    #deprecated
+    #@property
+    #def beta(self):
+    #    #kB = 1.3806488e-23 J K^-1
+    #    kB = 1
+    #    return 1.0/(kB*self.temperature)
+
+    #deprecated
+    #@property
+    #def bond_probability(self):
+    #    J = 1
+    #    kB =1
+    #    return 1 - np.exp(-2*J/(kB*self.temperature))
+
+    #deprecated
+    #def boltzmann(self, delta_energy):
+    #    return np.exp(-self.beta*delta_energy) 
 
     @property
     def magnetization(self):
         return self.grid.sum()
-
-    def boltzmann(self, delta_energy):
-        return np.exp(-self.beta*delta_energy) 
 
     def choose_site(self):
         """
@@ -89,13 +99,18 @@ class Ising(object):
         
         return site_x, site_y
 
-    def makegrid(self, x, y):
+    def makegrid(self, x, y, aligned=False):
         """ 
         Function that makes a numpy array with x rows and y columns and fills 
         the entries randomly with '1' or '-1'
+        If aligned = True, a grid of ones is returned.
         """
-        grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
-        return np.array(grid, dtype='int8')
+        if aligned:
+            grid = np.ones((x, y))
+            return np.array(grid, dtype='int8')
+        else:
+            grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
+            return np.array(grid, dtype='int8')
         
     def neighbors(self, site, boundary='periodic'):
         """
@@ -190,8 +205,8 @@ class Ising(object):
         """
         g = self.grid
         below, above, right, left = self.neighbors(site)
-        d_energy = -g[site] * (g[below] + g[above] +g[right] +g[left])
-        return -2*d_energy + 2*self.b_field*g[site]  
+        d_energy = -2*(-g[site] * (g[below] + g[above] +g[right] +g[left]))
+        return d_energy  
 
     
     def flip(self, prob, site):
@@ -216,15 +231,16 @@ class Ising(object):
         """
         i = 0
         flipcount = 0
+         
         while i < iterations:
             site = self.choose_site() 
             delta_e = self.delta_energy(site) 
-            probability = self.boltzmann(delta_e) 
+            probability = self.ptable[delta_e]
+            #probability = self.boltzmann(delta_e) #deprecated
             flipped = self.flip(probability, site) 
             
             if flipped and delta_e != 0:
                 flipcount += 1 
-
                 self.total_energy = self.total_energy + delta_e
 
             if self.printit is not None:
@@ -253,6 +269,10 @@ class Ising(object):
         """
         g = self.grid
 
+        J = 1
+        kB = 1
+        bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
+
         i=0
         while i < iterations:
             self.total_energy = self.calc_energy()
@@ -278,7 +298,7 @@ class Ising(object):
                 if seed_spin == g[site_to_test]:
                     determinant = np.random.ranf()
 
-                    if determinant <= self.bond_probability: 
+                    if determinant <= bond_probability: 
                         cluster.append(site_to_test)
 
                         nbrs = self.neighbors(site_to_test)
@@ -294,14 +314,14 @@ class Ising(object):
                     self.printlattice()
                     print("Temperature      : {}".format(self.temperature))
                     print("B-Field          : {}".format(self.b_field))
-                    print("Bond Probability : {}".format(self.bond_probability))
+                    #print("Bond Probability : {}".format(self.bond_probability))
+                    print("Bond Probability : {}".format(bond_probability))
                     print("Iterations       : {}".format(i))
                     print("Energy           : {}".format(self.total_energy))
                     print("Magnetization    : {}".format(self.magnetization))
                     print("x/y    : {}/{}".format(self.rij, self.kolom))
 
             if self.handler is not None and self.h5path is not None:
-                self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
                 self.handler.append(i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
                 self.handler.append(self.magnetization, self.h5path+'magnetization')
@@ -333,6 +353,7 @@ def get_arguments():
     parser.add_argument('-x', default=40,type=int, help="number of rows") 
     parser.add_argument('-p', '--printit', default=None, type=int,
                         help="Print lattice every p flips") 
+    parser.add_argument('--aligned', action='store_true')
     parser.add_argument('--mode', default='metropolis', choices=['metropolis','wolff'],
                         help="Evolve with this algorithm.") 
    

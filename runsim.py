@@ -51,13 +51,12 @@ def simulate():
             sim_str = str(simcount).zfill(indexwidth)
             h5path = "/"+"sim_"+sim_str+"/"
             i = Ising(args.x, args.y, temperature=T, handler=handler, 
-                      h5path=h5path)
+                      h5path=h5path, aligned=args.aligned)
             i.evolve(args.iterations) #TODO:need better stopping condition
 
             simcount += 1
             handler.file.flush()
         
-
 
 def get_arguments():
     """
@@ -76,6 +75,7 @@ def get_arguments():
     parser.add_argument('-f', '--filename', required=True,
                         help="hdf5 output file name")
 
+    parser.add_argument('--aligned', action='store_true')
     parser.add_argument('--tmin', default=0.001, type=float)
     parser.add_argument('--tmax', default=1000, type=float)
     parser.add_argument('--steps', default=5, type=float)
@@ -83,8 +83,6 @@ def get_arguments():
 
     args = parser.parse_args()
     return args
-
-
 
 
 if __name__ == "__main__":
