@@ -1,0 +1,184 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{bm}
+\usepackage{calligra}
+\usepackage{wrapfig}
+\usepackage{comment}
+\usepackage{subcaption}
+\usepackage{color}
+
+%\DeclareMathAlphabet{\mathcalligra}{T1}{calligra}{m}{n}
+%\DeclareFontShape{T1}{calligra}{m}{n}{<->s*[2.2]callig15}{}
+
+\setlength{\parindent}{0pt}
+
+
+\DeclarePairedDelimiter{\avg}{\langle}{\rangle}
+
+\title{The Lau/Ostoji\'c Ising Model simulation}
+\date{}
+\author{Bernie Lau and Oliver Ostoji\'c}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+{\color{red} Some introductory words here, not too many words, not too much physics.}
+\subsection{A bit of theory}
+In effect, we are investigating the famous Ising Hamiltonian without external field;
+
+\begin{equation}\label{eq:Hamiltonian}
+    H = -\beta J \sum_{\avg*{i,j}} \vec{S}_i \cdot \vec{S}_j
+\end{equation}
+
+The $\avg{i,j}$ indicates a sum over nearest neighbors, $\beta = 1/k_bT$ is the inverse temperature and $J$ is a
+ coupling constant indicating the strength of the interaction between neigbouring spins. In the whole experiment,
+ we set $J = k_b = 1$ which mesns we measure the (inverse) temperature in arbitrary units. This is justified by the
+ fact that we are mostly interested in the qualitative behaviour of the Hamiltonian. Also, since the lattice sizes we
+ will be simulating are about 20 orders of magnitude smaller than physical systems, the notion of temperature is not 
+ as clearly defined anyway. \\
+ Two algorithms are implemented in this simulation.
+
+\subsection{Our approach}
+
+
+\section{Thermalization and autocorrelation for the 40x40 lattice}
+
+
+In this section we present some results of a simulation of a 40x40 two dimensional Ising model, using a Metropolis algorithm.
+ We present plots of energy and magnetization as a function of time and report the thermalization times found for each plot.
+ We also plot autocorrelation functions for both enery and magnetization
+ for five values of the inverse temperature $\beta$ between $\beta = 0.3$ and $\beta = 0.5$. 
+ Both high temperature (fully disordered) and temperature (all spins aligned) initial conditions are simulated.
+ Time is measured in Monte-Carlo steps per spin for all simulations. Each simlutation "takes" $32\cdot 10^6$ 
+ Monte-Carlo steps.
+
+
+\subsection{Energy functions}
+To find the thermalization times, we plot the energy as a function of time (measured in Monte-Carlo steps per site)
+ and fit a general exponential curve and read off the characteristic time $\tau$:
+
+\begin{equation}\label{eq:exp_decay}
+    f(t)=Ae^{t/\tau} + C
+\end{equation}
+
+After a single characteristic time $\tau$, the value of the energy will be at about $37\%$ of its initial value and
+ the system will not yet be thermalized. We therefore define the
+ thermalization time as five times the characteristic time, just to be safe:
+ 
+\begin{equation*}
+    t_{therm} = 5\tau
+\end{equation*}
+
+Figure \ref{fig:Evt} shows the results of this procedure for the values $\beta = 0.3$; $\beta = 0.35$;
+ $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. Included are the acquired values of $t_{therm}$. Both 
+ high temperature and low temperature initial conditions are covered.
+\\
+\\
+{\color{red}REVIZE SECTION AFTER ADDING PLOTS AND WRITING INTRO}
+
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:Evt_highT}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:Evt_lowT}
+\end{subfigure}
+\caption{Energy vs ierations per spin for the values $\beta = 0.3$; $\beta = 0.35$;
+         $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. a) High temperature starting condition. 
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.
+         b) Low temperature starting condition.
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$)}}
+\label{fig:Evt}
+\end{figure}
+
+
+\subsection{Magnetization functions}
+As we are still looking for thermalization times, just now for magnetization, we use the same procedure as in
+ the previous section. 
+
+Figure \ref{fig:Mvt} shows plots of magnetization versus time for the values $\beta = 0.3$; $\beta = 0.35$;
+ $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$ for high and low temperature initial conditions. 
+
+
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:Mvt_highT}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:Mvt_lowT}
+\end{subfigure}
+\caption{Magnetization vs ierations per spin for the values $\beta = 0.3$; $\beta = 0.35$;
+         $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. a) High temperature starting condition
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.
+         b) Low temperature starting condition.
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.}
+\label{fig:Mvt}
+\end{figure}
+
+
+\subsection{Autocorrelation functions}
+In addition to the previous results, the autocorrelation times for both energy and magnetization can be
+ extracted from the simulations. We implement the formulas
+
+\begin{equation*}
+    c_e(\Delta t) = \avg{(E(t+\Delta t) - E_{avg})\cdot (E(t)-E_{avg})}_t
+\end{equation*}
+
+and
+
+\begin{equation*}
+    c_m(\Delta t) = \avg{(M(t+\Delta t) - M_{avg})\cdot (M(t)-M_{avg})}_t
+\end{equation*}
+
+
+where, $E_{avg}$ and $M_{avg}$ indicate averaging over the \textit{last} million values of the energy and magnetization
+ respectively. This in contrast to the averaging indicated by the $\avg{}_t$, which means we average over the number of
+ iterations. We again fit the general exponential decay given by equation \ref{eq:exp_decay}, and report the characteristic
+ time, which is by definition the autocorrelation time. The results are given below (Figure \ref{fig:autocorr})
+ for each simulation, i.e for the same values of $\beta$ as listed above.
+ 
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:autocorr_energy}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:autocorr_mag}
+\end{subfigure}
+\caption{Autocorrelation times vs $\Delta t$ for the values $\beta = 0.3$; $\beta = 0.35$;
+         $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. a) Energy autocorrelation function. 
+         b) Magnetization autocorrelation function.}
+\label{fig:autocorr}
+\end{figure}
+
+
+\section{Magnetization and magnetic suscepibility with metropolis}
+
+\section{The Wolff algorithm}
+
+\section{The 3D Ising model}
+\end{document}
