@@ -17,7 +17,7 @@
 
 \DeclarePairedDelimiter{\avg}{\langle}{\rangle}
 
-\title{The Lau/Ostoji\'c Ising Model simulation}
+\title{The Lau/Ostoji\'c Ising model simulation}
 \date{}
 \author{Bernie Lau and Oliver Ostoji\'c}
 
@@ -26,23 +26,42 @@
 \maketitle
 
 \section{Introduction}
-{\color{red} Some introductory words here, not too many words, not too much physics.}
-\subsection{A bit of theory}
-In effect, we are investigating the famous Ising Hamiltonian without external field;
+
+This project is in essence an investigation of the Ising Hamiltonian with no external field;\footnote{As always,
+$\avg{i,j}$ indicates a sum over nearest neighbors}
 
 \begin{equation}\label{eq:Hamiltonian}
-    H = -\beta J \sum_{\avg*{i,j}} \vec{S}_i \cdot \vec{S}_j
+    H = -\beta J \sum_{\avg*{i,j}} s_i s_j
 \end{equation}
 
-The $\avg{i,j}$ indicates a sum over nearest neighbors, $\beta = 1/k_bT$ is the inverse temperature and $J$ is a
- coupling constant indicating the strength of the interaction between neigbouring spins. In the whole experiment,
- we set $J = k_b = 1$ which mesns we measure the (inverse) temperature in arbitrary units. This is justified by the
- fact that we are mostly interested in the qualitative behaviour of the Hamiltonian. Also, since the lattice sizes we
- will be simulating are about 20 orders of magnitude smaller than physical systems, the notion of temperature is not 
- as clearly defined anyway. \\
- Two algorithms are implemented in this simulation.
+As this apparently simple Hamiltonian is known to result in very interesting and rich dynamical behavior on a 
+ macroscopic scale, we endeavor to find, through computational methods, some interesting thermodynamical quantities
+ and qualitative behaviors. Of primary interest is the search for signs of a phase transistion, which the two and three
+ dimensional Ising model is known to exhibit.
 
-\subsection{Our approach}
+ In order to be less vague, we shall from now on talk about the Ising Hamiltonian
+ in the context of ferromagnetism, where the quantites $s_i$ are associated with electron spins which can point in one of two
+ directions. We will also set the coupling energy and the Boltzmann canstant equal to one, 
+ $J = k_B = 1$, for all simulations. As a consequence, the inverse temperature $\beta = 1/k_BT$ is measured in unphysical
+ units. This is justified by the
+ fact that  we are primarily interested in the qualitative behavior of the system and all actual numbers in the following
+ simulations can still be compared to theoretical calculations and similar simulations.
+
+ Phase transitions are typically characterized by rapid changes in macroscopic quantities near the transition temperature, which
+ is called the critical temperature, $T_c$. The macroscopic quantities we will be investigating are the net magnetization,
+ $M = \sum_i s_i$, the magnetic susceptibility (a measure for how the magnetization reacts to external magnetic fields) and
+ the correlation length (a measure for the length scale at which the spins influence each other). These quantities and their
+ connection to phase transitions will be made more concrete in the relevant sections. 
+
+ The actual methods we employ are two Monte Carlo type algorithms, with most simulations carried out using a 
+ Metropolis algorithm and a couple of measurements using a Wolff algorithm. It seems appropriate therefore, to summarize the
+ principles of those algorithms here, in a minimalistic fashion.
+
+\subsection{Metropolis algorithm}
+As part of a broader class of simulation techniques called Monte Carlo algorithms, the Metropolis algorithm follows the
+ following basic procedure. Randomly choose a site from a square lattice populated by spins. 
+
+\subsection{Wolff algorithm}
 
 
 \section{Thermalization and autocorrelation for the 40x40 lattice}
@@ -84,13 +103,13 @@ Figure \ref{fig:Evt} shows the results of this procedure for the values $\beta =
 \centering
 \begin{subfigure}{.5\textwidth}
   \centering
-  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_unaligned_E_vs_time.png}
   \caption{}
   \label{fig:Evt_highT}
 \end{subfigure}%
 \begin{subfigure}{.5\textwidth}
   \centering
-  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_aligned_E_vs_time.png}
   \caption{}
   \label{fig:Evt_lowT}
 \end{subfigure}
@@ -115,13 +134,13 @@ Figure \ref{fig:Mvt} shows plots of magnetization versus time for the values $\b
 \centering
 \begin{subfigure}{.5\textwidth}
   \centering
-  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_unaligned_net_M_vs_time.png}
   \caption{}
   \label{fig:Mvt_highT}
 \end{subfigure}%
 \begin{subfigure}{.5\textwidth}
   \centering
-  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_aligned_net_M_vs_time.png}
   \caption{}
   \label{fig:Mvt_lowT}
 \end{subfigure}
@@ -178,7 +197,7 @@ where, $E_{avg}$ and $M_{avg}$ indicate averaging over the \textit{last} million
 
 \section{Magnetization and magnetic suscepibility with metropolis}
 
-\section{The Wolff algorithm}
+\section{The Wolff}
 
 \section{The 3D Ising model}
 \end{document}
