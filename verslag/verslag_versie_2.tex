@@ -88,9 +88,9 @@ Once the spin flip is accepted or rejected, the process is repeated and each ite
 \subsection{Wolff algorithm}
 An example of a cluster-flipping algorithm, the Wolff algorithm works by iteratively picking out
  an entire cluster of spins pointing in the same direction and then flipping them all at the same time. The actual physics content of this 
- procedure is contained in the generation of the cluster, which is done based on a temperature dependent probability chosen such that the
- conditions of detailed balance and ergodicity are satisfied.
- More specifically, the procedure which is iterated is as followsi;
+ procedure resides entirely in the generation of the cluster, which is done based on a temperature dependent probability chosen such that the
+ conditions of detailed balance and ergodicity are again satisfied.
+ More specifically, the procedure which is iterated is as follows;
  \begin{enumerate}
  \item Pick a spin at random and look at all its neighbors.
  \item If a neighbor is pointing in the same direction as the current one, add it to the cluster with a probability $P_{add}$ given by
@@ -99,7 +99,6 @@ An example of a cluster-flipping algorithm, the Wolff algorithm works by iterati
     P_{add} = 1 - e^{-2\beta J}
 \end{equation}
  
-
  \item For each spin that was added, look at all \textit{its} neighbors and add them with the same probability. Do this until no spins are left
  in the cluster whose neighbors have not been considered for addition.
  \item Flip the cluster
@@ -108,6 +107,13 @@ An example of a cluster-flipping algorithm, the Wolff algorithm works by iterati
 
 The Wolff algorithm, although less intuitive than Metropolis has the advantage of being much faster near the critical temperature, thereby
  allowing us to obtain more accurate results in the region of interest.
+
+\subsection{Technicalities}
+In what follows, we will set the coupling energy and the Boltzmann canstant equal to one, 
+ $J = k_B = 1$, for all simulations. As a consequence, the inverse temperature $\beta = 1/k_BT$ is measured in unphysical
+ units. This is justified by the
+ fact that  we are primarily interested in the qualitative behavior of the system and all actual numbers in the following
+ simulations can still be compared to theoretical calculations and similar simulations. 
 
 \section{Thermalization and autocorrelation for the 40x40 lattice}
 
