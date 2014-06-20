@@ -1,0 +1,254 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{bm}
+\usepackage{calligra}
+\usepackage{wrapfig}
+\usepackage{comment}
+\usepackage{subcaption}
+\usepackage{color}
+
+%\DeclareMathAlphabet{\mathcalligra}{T1}{calligra}{m}{n}
+%\DeclareFontShape{T1}{calligra}{m}{n}{<->s*[2.2]callig15}{}
+
+\setlength{\parindent}{0pt}
+
+
+\DeclarePairedDelimiter{\avg}{\langle}{\rangle}
+
+\title{The Lau/Ostoji\'c Ising model simulation}
+\date{}
+\author{Bernie Lau and Oliver Ostoji\'c}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This project is in essence an investigation of the Ising Hamiltonian with no external field;\footnote{As always,
+$\avg{i,j}$ indicates a sum over nearest neighbors}
+
+\begin{equation}\label{eq:Hamiltonian}
+    H = -J \sum_{\avg*{i,j}} s_i s_j
+\end{equation}
+
+As this apparently simple Hamiltonian is known to result in very interesting and rich dynamical behavior on a 
+ macroscopic scale, we endeavor to find, through computational methods, some interesting thermodynamical quantities
+ and qualitative behaviors. Of primary interest is the search for signs of a phase transistion, which the two and three
+ dimensional Ising model is known to exhibit.
+
+ In order to be less vague, we shall from now on talk about the Ising Hamiltonian
+ in the context of ferromagnetism, where the quantites $s_i$ are associated with electron spins which can point in one of two
+ directions. We will also set the coupling energy and the Boltzmann canstant equal to one, 
+ $J = k_B = 1$, for all simulations. As a consequence, the inverse temperature $\beta = 1/k_BT$ is measured in unphysical
+ units. This is justified by the
+ fact that  we are primarily interested in the qualitative behavior of the system and all actual numbers in the following
+ simulations can still be compared to theoretical calculations and similar simulations.
+
+ Phase transitions are typically characterized by rapid changes in macroscopic quantities near the transition temperature, which
+ is called the critical temperature, $T_c$. The macroscopic quantities we will be investigating are the net magnetization,
+ $M = \sum_i s_i$, the magnetic susceptibility (a measure for how the magnetization reacts to external magnetic fields) and
+ the correlation length (a measure for the length scale at which the spins influence each other). These quantities and their
+ connection to phase transitions will be made more concrete in the relevant sections. 
+
+ The actual methods we employ are two Monte Carlo type algorithms, with most simulations carried out using a 
+ Metropolis algorithm and a couple of measurements using a Wolff algorithm. It seems appropriate therefore, to summarize the
+ principles of those algorithms here, in a minimalistic fashion.
+
+\subsection{Metropolis algorithm}
+As the focus of this assignment is on the \textit{implementation} of the Metropolis algorithm rather than its theoretical
+ aspects, we have chosen to omit the technical details and just outline the procedure used in its implementation here.
+
+ Given a
+ lattice with a spin variable $s_i \in \{-1,1\}$ on each lattice point $i$, we define a "state" to be a particular
+ configuration of all the ${s_i}$. The energy $E_\mu$ of the system in a state $\mu$ is determined by the Hamiltonian
+ (Equation \ref{eq:Hamiltonian}). Time evolution of the system is achieved by randomly choosing a single site $j$ and determining
+ the energy $E_\nu$ of the system if the spin on that site were flipped, $s_j \rightarrow -s_j$. Weather or not we actually flip
+ the spin is determined by the the number $A(\mu \rightarrow \nu)$ given by;
+
+
+\begin{equation}\label{eq:A-ratio}
+    A(\mu \rightarrow \nu) = \begin{cases}
+        e^{-\beta (E_\nu - E_\mu)} & \mbox{if} \,\,  E_\nu - E_\mu > 0 \\
+        1 & \mbox{else}
+    \end{cases}
+\end{equation}
+
+Once the spin flip is accepted or rejected, the process is repeated and each iteration is called a "Monte Carlo step". It is actually
+ this particular definiton of the so called
+ "acceptance ratio", $A(\mu \rightarrow \nu)$ that makes the algorihm a Metropolis algorithm,
+ the rest of the procedure is common to all single spin-flip dynamics Monte Carlo algorithms. The conditions
+ of detailed balance and ergodicity, which ensure that the
+ equilibrium state of the system will behave according to Boltzmann statistics and that each state can be reached from each other state, are
+ statisfied by this acceptance ratio, as must be the case with all Monte Carlo algorithms.
+
+
+\subsection{Wolff algorithm}
+An example of a cluster-flipping algorithm, the Wolff algorithm works by iteratively picking out
+ an entire cluster of spins pointing in the same direction and then flipping them all at the same time. The actual physics content of this 
+ procedure resides entirely in the generation of the cluster, which is done based on a temperature dependent probability chosen such that the
+ conditions of detailed balance and ergodicity are again satisfied.
+ More specifically, the procedure which is iterated is as follows;
+ \begin{enumerate}
+ \item Pick a spin at random and look at all its neighbors.
+ \item If a neighbor is pointing in the same direction as the current one, add it to the cluster with a probability $P_{add}$ given by
+
+\begin{equation}\label{eq:A-ratio}
+    P_{add} = 1 - e^{-2\beta J}
+\end{equation}
+ 
+ \item For each spin that was added, look at all \textit{its} neighbors and add them with the same probability. Do this until no spins are left
+ in the cluster whose neighbors have not been considered for addition.
+ \item Flip the cluster
+
+ \end{enumerate}
+
+The Wolff algorithm, although less intuitive than Metropolis has the advantage of being much faster near the critical temperature, thereby
+ allowing us to obtain more accurate results in the region of interest.
+
+\subsection{Technicalities}
+In what follows, we will set the coupling energy and the Boltzmann canstant equal to one, 
+ $J = k_B = 1$, for all simulations. As a consequence, the inverse temperature $\beta = 1/k_BT$ is measured in unphysical
+ units. This is justified by the
+ fact that  we are primarily interested in the qualitative behavior of the system and all actual numbers in the following
+ simulations can still be compared to theoretical calculations and similar simulations. 
+
+\section{Thermalization and autocorrelation for the 40x40 lattice}
+
+
+In this section we present some results of a simulation of a 40x40 two dimensional Ising model, using a Metropolis algorithm.
+ We present plots of energy and magnetization as a function of time and report the thermalization times found for each plot.
+ We also plot autocorrelation functions for both enery and magnetization
+ for five values of the inverse temperature $\beta$ between $\beta = 0.3$ and $\beta = 0.5$. 
+ Both high temperature (fully disordered) and temperature (all spins aligned) initial conditions are simulated.
+ Time is measured in Monte-Carlo steps per spin for all simulations. Each simlutation "takes" $32\cdot 10^6$ 
+ Monte-Carlo steps.
+
+
+\subsection{Energy functions}
+To find the thermalization times, we plot the energy as a function of time (measured in Monte-Carlo steps per site)
+ and fit a general exponential curve and read off the characteristic time $\tau$:
+
+\begin{equation}\label{eq:exp_decay}
+    f(t)=Ae^{t/\tau} + C
+\end{equation}
+
+After a single characteristic time $\tau$, the value of the energy will be at about $37\%$ of its initial value and
+ the system will not yet be thermalized. We therefore define the
+ thermalization time as five times the characteristic time, just to be safe:
+ 
+\begin{equation*}
+    t_{therm} = 5\tau
+\end{equation*}
+
+Figure \ref{fig:Evt} shows the results of this procedure for the values $\beta = 0.3$; $\beta = 0.35$;
+ $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. Included are the acquired values of $t_{therm}$. Both 
+ high temperature and low temperature initial conditions are covered.
+\\
+\\
+{\color{red}REVIZE SECTION AFTER ADDING PLOTS AND WRITING INTRO}
+
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_unaligned_E_vs_time.png}
+  \caption{}
+  \label{fig:Evt_highT}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_aligned_E_vs_time.png}
+  \caption{}
+  \label{fig:Evt_lowT}
+\end{subfigure}
+\caption{Energy vs ierations per spin for the values $\beta = 0.3$; $\beta = 0.35$;
+         $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. a) High temperature starting condition. 
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.
+         b) Low temperature starting condition.
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$)}}
+\label{fig:Evt}
+\end{figure}
+
+
+\subsection{Magnetization functions}
+As we are still looking for thermalization times, just now for magnetization, we use the same procedure as in
+ the previous section. 
+
+Figure \ref{fig:Mvt} shows plots of magnetization versus time for the values $\beta = 0.3$; $\beta = 0.35$;
+ $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$ for high and low temperature initial conditions. 
+
+
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_unaligned_net_M_vs_time.png}
+  \caption{}
+  \label{fig:Mvt_highT}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{metro_40x40_iter_32M_aligned_net_M_vs_time.png}
+  \caption{}
+  \label{fig:Mvt_lowT}
+\end{subfigure}
+\caption{Magnetization vs ierations per spin for the values $\beta = 0.3$; $\beta = 0.35$;
+         $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. a) High temperature starting condition
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.
+         b) Low temperature starting condition.
+         {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.}
+\label{fig:Mvt}
+\end{figure}
+
+
+\subsection{Autocorrelation functions}
+In addition to the previous results, the autocorrelation times for both energy and magnetization can be
+ extracted from the simulations. We implement the formulas
+
+\begin{equation*}
+    c_e(\Delta t) = \avg{(E(t+\Delta t) - E_{avg})\cdot (E(t)-E_{avg})}_t
+\end{equation*}
+
+and
+
+\begin{equation*}
+    c_m(\Delta t) = \avg{(M(t+\Delta t) - M_{avg})\cdot (M(t)-M_{avg})}_t
+\end{equation*}
+
+
+where, $E_{avg}$ and $M_{avg}$ indicate averaging over the \textit{last} million values of the energy and magnetization
+ respectively. This in contrast to the averaging indicated by the $\avg{}_t$, which means we average over the number of
+ iterations. We again fit the general exponential decay given by equation \ref{eq:exp_decay}, and report the characteristic
+ time, which is by definition the autocorrelation time. The results are given below (Figure \ref{fig:autocorr})
+ for each simulation, i.e for the same values of $\beta$ as listed above.
+ 
+\begin{figure}[h!]
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:autocorr_energy}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.4\linewidth]{Boltzmann.jpg}
+  \caption{}
+  \label{fig:autocorr_mag}
+\end{subfigure}
+\caption{Autocorrelation times vs $\Delta t$ for the values $\beta = 0.3$; $\beta = 0.35$;
+         $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. a) Energy autocorrelation function. 
+         b) Magnetization autocorrelation function.}
+\label{fig:autocorr}
+\end{figure}
+
+
+\section{Magnetization and magnetic suscepibility with metropolis}
+
+\section{The Wolff}
+
+\section{The 3D Ising model}
+\end{document}
