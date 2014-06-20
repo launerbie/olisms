@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
+import random
 import argparse
 import numpy as np
 
 def main():
     #TODO: remove main(). 
     i = Ising(args.x, args.y, args.bfield, args.temperature, printit=args.printit)
-    i.evolve(args.iterations)
+    i.ewolve(args.iterations)
 
 class Ising(object):
     """
@@ -42,10 +43,19 @@ class Ising(object):
             self.handler.append(np.array(self.grid, dtype='int8'), self.h5path+'initgrid', dtype='int8')
 
     @property
+    def bond_probability(self):
+        J = 1
+        kB =1
+        return 1 - np.exp(-2*J/(kB*self.temperature))
+
+    @property
     def beta(self):
         #kB = 1.3806488e-23 J K^-1
         kB = 1
         return 1.0/(kB*self.temperature)
+
+    def magnetization(self):
+        return self.grid.sum()
 
     def makegrid(self, x, y):
         """ 
@@ -84,105 +94,94 @@ class Ising(object):
 
     def choose_site(self):
         """
-        Randomly chooses site to flip
+        Randomly chooses a site in the grid.
         """
         #TODO: 3D array
         site_x = np.random.randint(0,self.rij)
         site_y = np.random.randint(0,self.kolom)
         
         return site_x, site_y
-  
-    def delta_energy(self, site):
-        """
-        Berekent verandering in energie als gevolg van het omdraaien van het 
-        teken (spin flip) op de positie "site".
-
-        """
-        LR = self.rij - 1  # LR: Laatste Rij Index
-        LK = self.kolom - 1  # LK: Laatste Kolom Index
-        x, y = site
-        g = self.grid
         
-        if not (x == 0 or x == LR or y == 0 or y == LK): # niet rand ==> midden 
-            d_energy = -g[x][y]*(g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][y-1])
 
+    def ewolve(self, iterations):
+        """
+        Evolve it using Wolff's algorithm.
+        """
+        g = self.grid
+
+        i=0
+        while i < iterations:
+            self.total_energy = self.calc_energy() 
+
+            if args.verbose is True:
+                self.printlattice()
+                print("Clusters flipped : {}".format(i))
+                print("Temperature      : {}".format(self.temperature))
+                print("Bond Probability : {}".format(self.bond_probability))
+
+            cluster = list() 
+            perimeter_spins = list() 
+
+            seed = self.choose_site() 
+            seed_spin = g[seed]
+            cluster.append(seed)
+
+            nbrs = self.neighbors(seed)
+
+            for nbr in nbrs:
+                if seed_spin == g[nbr]:
+                    perimeter_spins.append(nbr)
+
+            while len(perimeter_spins) != 0:
+
+                site_to_test = perimeter_spins[0]
+                perimeter_spins.pop(0)
+
+                if seed_spin == g[site_to_test]:
+                    determinant = np.random.ranf()
+
+                    if determinant <= self.bond_probability: #then add to cluster
+                        cluster.append(site_to_test)
+
+                        nbrs = self.neighbors(site_to_test)
+                        for nbr in nbrs:
+                            if nbr not in cluster and nbr not in perimeter_spins:
+                                perimeter_spins.append(nbr)
+
+            #flip cluster
+            g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
+
+            i += 1
+
+    def neighbors(self, site):
+        """
+        TODO: maybe this function can be used in delta_energy in the metropolis algorithm?
+        """
+        LR = self.rij - 1  
+        LK = self.kolom - 1
+        x, y = site
+        if not (x == 0 or x == LR or y == 0 or y == LK): # dan niet rand  
+            nbrs = (x+1, y), (x-1, y), (x, y+1), (x, y-1)
         else: #dan rand
             if not ((x == 0 and (y == 0 or y == LK)) or (x == LR and (y == 0 or y == LK))): #dan niet hoek
                 if x == 0: 
-                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][y+1] + g[x][y-1])
-
+                    nbrs = (x+1, y), (LR, y), (x, y+1), (x, y-1)
                 elif x == LR: 
-                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][y+1] + g[x][y-1])
-
+                    nbrs = (0, y), (x-1, y), (x, y+1), (x, y-1)
                 elif y == 0: 
-                    d_energy = -g[x][y] * (g[x+1][y] + g[x-1][y] + g[x][y+1] + g[x][LK])
-
+                    nbrs = (x+1, y), (x-1, y), (x, y+1), (x, LK)
                 else: 
-                    d_energy = -g[x][y] * (g[x+1][y] + g[x-1][y] + g[x][0]   + g[x][y-1])
-
+                    nbrs = (x+1, y), (x-1, y), (x, 0), (x, y-1)
             else: # dan hoek
                 if (x == 0 and y == 0):
-                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][y+1] + g[x][LK])
-
+                    nbrs = (x+1, y), (LR, y), (x, y+1), (x, LK)
                 elif (x == 0 and y == LK):
-                    d_energy = -g[x][y] * (g[x+1][y] + g[LR][y]  + g[x][0]   + g[x][y-1])
-
+                    nbrs = (x+1, y), (LR, y), (x, 0), (x, y-1)
                 elif (x == LR and y == 0):
-                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][y+1] + g[x][LK])
-
+                    nbrs = (0, y), (x-1, y), (x, y+1), (x, LK)
                 else:
-                    d_energy = -g[x][y] * (g[0][y]   + g[x-1][y] + g[x][0]   + g[x][y-1])
-                
-        return -2*d_energy + 2*self.b_field*g[x][y]  
-
-
-    def magnetization(self):
-        return self.grid.sum()
-
-    def boltzmann(self, delta_energy):
-        return np.exp(-self.beta*delta_energy) 
-
-    
-    def flip(self, prob, site):
-        x, y = site
-        determinant = np.random.ranf() #random flt from uniform distr (0,1).
-    
-        if prob >= 1:
-            self.grid[x][y] = -self.grid[x][y]
-            return True
-
-        else:
-            if determinant <= prob:                     
-                self.grid[x][y] = -self.grid[x][y]
-                return True
-            else:
-                return False
-
-        
-    def evolve(self, iteraties):
-
-        i = 0
-        while i < iteraties:
-            site = self.choose_site() 
-            delta_e = self.delta_energy(site) 
-            probability = self.boltzmann(delta_e) 
-            flipped = self.flip(probability, site) 
-            
-            if flipped and delta_e != 0:
-                self.total_energy = self.total_energy + delta_e
-
-                if self.printit is not None:
-                    if i % self.printit == 0 :
-                        self.printlattice()
-
-            if self.handler is not None and self.h5path is not None:
-                self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
-                self.handler.append(i, self.h5path+'iterations', dtype='int64')
-                self.handler.append(self.total_energy, self.h5path+'energy')
-                self.handler.append(self.magnetization(), self.h5path+'magnetization')
-                
-            i = i + 1
-
+                    nbrs = (0, y), (x-1, y), (x, 0), (x, y-1)
+        return nbrs
 
     def printlattice(self):
         """
@@ -197,6 +196,7 @@ class Ising(object):
         print(str_ising)
         print("\n")
 
+
 def get_arguments():
     """
     To add arguments, call: parser.add_argument
@@ -210,6 +210,7 @@ def get_arguments():
                         help="Number of iterations, default: 100000") 
     parser.add_argument('-b', '--bfield', default=0.00, type=float,
                         help="Uniform external magnetic field, default: 0") 
+    parser.add_argument('-v', '--verbose', action='store_true') 
     parser.add_argument('-y', default=40,type=int,help="number of columns") 
     parser.add_argument('-x', default=40,type=int, help="number of rows") 
     parser.add_argument('-f', '--filename', default='test.hdf5', 
