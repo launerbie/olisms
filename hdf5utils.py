@@ -74,7 +74,7 @@ class HDF5Handler(object):
                 h.append(ndarray, '/grp1/velocity')
 
     """
-    def __init__(self, filename, mode='a'):
+    def __init__(self, filename, mode='a', prefix=None):
         """
         Parameters
         ----------
@@ -83,6 +83,7 @@ class HDF5Handler(object):
         """
         self.filename = filename
         self.mode = mode
+        self.prefix = prefix
         self.index = dict()
 
     def __enter__(self):
@@ -107,13 +108,20 @@ class HDF5Handler(object):
         else:
             raise TypeError("{} is not supported".format(type(array)))
 
-        if dset_path in self.index:
-            self.index[dset_path].append(ndarray)
+        if self.prefix is not None:
+           fulldsetpath = self.prefix+dset_path
         else:
-            self.create_dset(dset_path, array, **kwargs)
-            self.index[dset_path].append(ndarray)
+           fulldsetpath = dset_path
 
-    def create_dset(self, dset_path, array, chunksize=1000, blockfactor=100, dtype='float32'):
+
+        if fulldsetpath in self.index:
+            self.index[fulldsetpath].append(ndarray)
+        else:
+            self.create_dset(fulldsetpath, array, **kwargs)
+            self.index[fulldsetpath].append(ndarray)
+
+
+    def create_dset(self, dset_path, array, chunksize=1000, blockfactor=100, dtype='float64'):
         """
         Define h5py dataset parameters here. 
 
@@ -163,8 +171,7 @@ class HDF5Handler(object):
 def convert_to_ndarray(array):
     #TODO: this is too similar too get_shape. Rethink implementation
     if is_scalar(array):
-        scalar = array
-        ndarray = numpy.array([scalar])
+        return array
 
     else: #convert tuple/list/ndarray
         if isinstance(array, numpy.ndarray):
@@ -181,7 +188,7 @@ def get_shape(array):
     returns shape of array or return (1,) if it is a scalar.
     """
     if is_scalar(array):
-        arr_shape = (1,)
+        arr_shape = ()
     else:
         if isinstance(array, numpy.ndarray):
             arr_shape = array.shape
