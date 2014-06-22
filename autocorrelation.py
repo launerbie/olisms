@@ -3,12 +3,15 @@
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
 def main():
  
-    f = h5py.File('test_new_autocorr.hdf5')
+    f = h5py.File(args.filename)
     
-    autocorrelation_energy(f) 
+#    autocorrelation_energy(f, args.n) 
+    autocorrelation_magnetization(f, args.n) 
+    
 
 def variance(input_array):
 
@@ -24,7 +27,7 @@ def print_progress(counter, total, stepsize):
     if (counter)%(total/stepsize) == 0:
         print('PROGRESS: ', counter/(total/100), '%')
 
-def autocorrelation_energy(f):
+def autocorrelation_energy(f, number_of_spins):
     sims = f.values()
 
     simulation_number = 1
@@ -35,15 +38,22 @@ def autocorrelation_energy(f):
 
         figname = str(s.name)
 
-        energy = s['energy'].value
+        if (number_of_spins == None):
+            N = s['lattice_size'][0]
+        else:
+            N = number_of_spins #Included so that we can plot "old" data sets as well
+      
+        MSC0 = int(10*N)
+
+        energy = s['energy'][-MSC0:]
         
         '''
         Hier implementeren: c_e(Dt) = <(E(t+Dt)-<E>)*(E(t)-<E>)>_t
         '''
 
-        size_energy = s['energy'].shape[0]
+        size_energy = len(s['energy'][-MSC0:])
         
-        avg_energy = s['energy'].value.mean()
+        avg_energy = s['energy'][-MSC0:].mean()
  
         delta_t = np.arange(size_energy)
         correlation = [] 
@@ -71,11 +81,11 @@ def autocorrelation_energy(f):
         ax.plot(delta_t, corr_array)
 
         ax.set_xlabel('delta_t')
-        ax.set_ylabel('correlation')
+        ax.set_ylabel('c_e')
  
         plt.savefig('plots2'+figname+"energy_autocorrelation"+".png")   
 
-def autocorrelation_magnetization(f):
+def autocorrelation_magnetization(f, number_of_spins):
     sims = f.values()
 
     simulation_number = 1
@@ -86,15 +96,22 @@ def autocorrelation_magnetization(f):
 
         figname = str(s.name)
 
-        magnetization = s['magnetization'].value
+        if (number_of_spins == None):
+            N = s['lattice_size'][0]
+        else:
+            N = number_of_spins #Included so that we can plot "old" data sets as well
+       
+        MSC0 = int(10*N)
+
+        magnetization = s['magnetization'][-MSC0:]
         
         '''
         Hier implementeren: c_m(Dt) = <(M(t+Dt)-<M>)*(M(t)-<M>)>_t
         '''
 
-        size_magnetization = s['magnetization'].shape[0]
+        size_magnetization = len(s['magnetization'][-MSC0:])
         
-        avg_magnetization = s['magnetization'].value.mean()
+        avg_magnetization = s['magnetization'][-MSC0:].mean()
  
         delta_t = np.arange(size_magnetization)
         correlation = [] 
@@ -122,8 +139,23 @@ def autocorrelation_magnetization(f):
         ax.plot(delta_t, corr_array)
 
         ax.set_xlabel('delta_t')
-        ax.set_ylabel('c_e')
+        ax.set_ylabel('c_m')
  
-        plt.savefig('plots2'+figname+"magnetization_autocorrelation"+".png")   
+        plt.savefig('plots3'+figname+"magnetization_autocorrelation"+".png")   
 
-main()            
+def get_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename', metavar="HDF5 FILENAME")
+    parser.add_argument('-n', default = None, type = int,
+                       help="Number of spins. Specify only if hdf5 file does not include this info.")
+
+    args = parser.parse_args()
+    return args
+
+if __name__ == "__main__":
+    args = get_arguments()
+    print(args)
+    main()
+
+
+
