@@ -7,8 +7,10 @@ import numpy as np
 def main():
     #TODO: remove main(). 
     
-    i = Ising(args.x, args.y, args.bfield, args.temperature, 
+    i = Ising(args.x, args.y, args.z, args.bfield, args.temperature, 
               printit=args.printit, mode=args.mode, aligned=args.aligned)
+
+    print(i.diepte)
 
     i.evolve(args.iterations)
 
@@ -21,6 +23,7 @@ class Ising(object):
         ----------
         rij : number of rows in lattice
         kolom: number of columns in lattice
+        diepte: number of depth units in lattice
         b_field: strength of the uniform b-field
         temperature: temperature 
         handler: HDF5Handler instance
@@ -58,7 +61,7 @@ class Ising(object):
                                 self.h5path+'initgrid', dtype='int8')
 
     def make_probability_table(self):
-        delta_energies = [-8, -4, 0, 4, 8] #TODO: un-hardcode
+        delta_energies = [-12, -8, -4, 0, 4, 8, 12] #TODO: un-hardcode 
         ptable = dict() 
         for dE in delta_energies:
             ptable.update({dE:np.exp(-dE/self.temperature)}) 
@@ -204,8 +207,8 @@ class Ising(object):
         energy = self.b_field * self.magnetization
 
         for site, value in np.ndenumerate(g):
-            below, above, right, left = self.neighbors_no_logic(site)
-            energy = energy + g[site]*( g[right] + g[below] )
+            below, above, right, left, back, front = self.neighbors_no_logic(site)
+            energy = energy + g[site]*( g[right] + g[below] + g[front])
 
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
@@ -349,7 +352,7 @@ def get_arguments():
 
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000") 
-    parser.add_argument('-T', '--temperature', default=0.001, type=float,
+    parser.add_argument('-T', '--temperature', default=0.01, type=float,
                         help="The Temperature") 
     parser.add_argument('-b', '--bfield', default=0.00, type=float,
                         help="Uniform external magnetic field, default: 0") 
