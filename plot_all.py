@@ -4,17 +4,20 @@ import os
 import h5py
 import numpy
 import argparse
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 from matplotlib import cm
 
 
 def main():
-    directory = 'figures/'
+    directory = 'figures'
     if not os.path.exists(directory):
         os.makedirs(directory)
 
     f = h5py.File(args.filename) 
+    basename = os.path.basename(args.filename)
+    name = os.path.splitext(basename)[0]
 
     def plot_netmagnitization_vs_iteration():
         fig = plt.figure(figsize=(8,8))        
@@ -32,7 +35,7 @@ def main():
         ax.legend(loc='best', prop={'size':8})
 
         if not args.plot:
-            plt.savefig('figures/'+str(args.filename)+"net_M_vs_iters"+".png", bbox_inches='tight')
+            plt.savefig(directory+"/"+str(name)+"_net_M_vs_iters"+".png", bbox_inches='tight')
             fig.clf()
             plt.close()
         else:
@@ -54,7 +57,7 @@ def main():
         ax.legend(loc='best', prop={'size':8})
 
         if not args.plot:
-            plt.savefig('figures/'+str(args.filename)+"E_vs_iters"+".png", bbox_inches='tight')
+            plt.savefig(directory+"/"+str(name)+"_E_vs_iters"+".png", bbox_inches='tight')
             fig.clf()
             plt.close()
         else:
@@ -71,33 +74,35 @@ def main():
             T = sim['temperature'][0]
             temperatures.append(T)
             net_M = abs(sim['magnetization'][-2000:])
-            chi.append(T/1600.0*numpy.var(net_M))
+            chi.append((1/(T*1600.0))*numpy.var(net_M))
             
         ax.plot(numpy.array(temperatures), chi, marker='o')
         ax.set_xlabel('1/T')
         ax.set_ylabel('chi')
 
         if not args.plot:
-            plt.savefig('figures/'+str(args.filename)+"chi_vs_T"+".png", bbox_inches='tight')
+            plt.savefig(directory+"/"+str(name)+"_chi_vs_T"+".png", bbox_inches='tight')
             fig.clf()
             plt.close()
         else:
             plt.show()
 
-    def plot_all_in_one(MCS0=18000):
+    def plot_all_in_one():
         fig = plt.figure(figsize=(8,8))        
         ax1 = fig.add_subplot(221) # E vs MCS
         ax2 = fig.add_subplot(222) # |M| vs MCS
         ax3 = fig.add_subplot(223) # <|M|> vs T
         ax4 = fig.add_subplot(224) # chi vs T
 
-        N = 25
+  
         
         temperatures = []
         avg_net_mags = []
         chi = []
 
         for sim in f.values(): #Each sim corresponds to a simulation at some Temperature
+            N = sim['lattice_size'][0]
+            MCS0 = int(700*N)
             T = sim['temperature'][0]
             M = sim['magnetization'][-MCS0:]
             net_M = abs(M)
@@ -106,7 +111,7 @@ def main():
 
             temperatures.append(T)
             avg_net_mags.append(numpy.mean(net_M))
-            chi.append(T/N*numpy.var(net_M))
+            chi.append(1/(T*N)*numpy.var(net_M))
 
             ax1.plot(iterations, E)
             ax2.plot(iterations, net_M)
@@ -115,7 +120,7 @@ def main():
         ax4.plot(numpy.array(temperatures), chi, c='k', marker='o')
 
         if not args.plot:
-            plt.savefig('figures/'+str(args.filename)+"summary"+".png", bbox_inches='tight')
+            plt.savefig(directory+"/"+str(name)+"_summary"+".png", bbox_inches='tight')
             fig.clf()
             plt.close()
         else:

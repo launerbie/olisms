@@ -51,11 +51,11 @@ class Ising(object):
         self.h5path = h5path 
         self.printit = printit
         self.ptable = self.make_probability_table()
-        
+        self.lattice_size = rij*kolom
 
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
-            #self.handler.append(self.b_field, self.h5path+'bfield')
+            self.handler.append(self.lattice_size, self.h5path+'lattice_size')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
 
