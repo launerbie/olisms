@@ -7,14 +7,17 @@ import numpy
 
 from ising_model import Ising
 from hdf5utils import HDF5Handler
-
+from three_dim_ising import Ising as Ising_3d
 
 def main():
     if os.path.exists(args.filename):
         print("{} already exists. Aborting.".format(args.filename))
         exit(0)
     else:
-        simulate()
+        if args.z is None:
+            simulate()
+        else:
+            simulate_3d()
     
 
 def simulate():
@@ -51,12 +54,34 @@ def simulate():
             sim_str = str(simcount).zfill(indexwidth)
             h5path = "/"+"sim_"+sim_str+"/"
             i = Ising(args.x, args.y, temperature=T, handler=handler, 
-                      h5path=h5path, aligned=args.aligned)
+                      h5path=h5path, aligned=args.aligned, mode=args.algorithm)
             i.evolve(args.iterations) #TODO:need better stopping condition
 
             simcount += 1
             handler.file.flush()
-        
+
+def simulate_3d():
+    Tmin = args.tmin
+    Tmax = args.tmax
+    steps = args.steps
+    
+    temperatures = numpy.linspace(Tmin, Tmax, steps)
+
+    with HDF5Handler(args.filename) as handler:
+        simcount = 0
+        indexwidth = len(str(steps))
+        for T in temperatures:
+            print(T)
+            sim_str = str(simcount).zfill(indexwidth)
+            h5path = "/"+"sim_"+sim_str+"/"
+            i = Ising_3d(args.x, args.y, args.z, temperature=T, handler=handler, 
+                      h5path=h5path, aligned=args.aligned, mode=args.algorithm)
+            i.evolve(args.iterations) #TODO:need better stopping condition
+
+            simcount += 1
+            handler.file.flush()
+
+
 
 def get_arguments():
     """
@@ -72,6 +97,7 @@ def get_arguments():
                         help="Uniform external magnetic field, default: 0")
     parser.add_argument('-y', default=40, type=int, help="number of columns")
     parser.add_argument('-x', default=40, type=int, help="number of rows")
+    parser.add_argument('-z', default=None, type=int, help="number of depth_units")
     parser.add_argument('-f', '--filename', required=True,
                         help="hdf5 output file name")
 
