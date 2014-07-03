@@ -6,5 +6,6 @@
 *.png
 *.jpg
 *.hdf5
+*.zsh
 *__pycache__
 
