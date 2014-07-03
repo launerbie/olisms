@@ -15,46 +15,47 @@ def main():
         os.makedirs(directory)
 
     f = h5py.File(args.filename) 
+    basename = os.path.basename(args.filename)
+    name = os.path.splitext(basename)[0]
 
     def plot_netmagnitization_vs_iteration():
-        fig = plt.figure(figsize=(8,8))        
+        fig = plt.figure(figsize=(8, 6))        
         ax = fig.add_subplot(111)
     
         for sim in f.values(): #Each sim corresponds to a simulation at some Temperature
             T = sim['temperature'][0]
-            M = sim['magnetization'][-1000:]
-            #E = sim['energy'].value
-            iterations = sim['iterations'][-1000:]
+            M = sim['magnetization'][:100000]
+            iterations = sim['iterations'][:100000]
             ax.plot(iterations, abs(M), label=str(T))
     
-        ax.set_xlabel('iteration')
-        ax.set_ylabel('net magnetization')
+        ax.set_xlabel('time')
+        ax.set_ylabel('|M|')
         ax.legend(loc='best', prop={'size':8})
 
         if not args.plot:
-            plt.savefig('figures/'+str(args.filename)+"net_M_vs_iters"+".png", bbox_inches='tight')
+            plt.savefig('figures/'+str(name)+"_net_M_vs_time"+".png", bbox_inches='tight')
             fig.clf()
             plt.close()
         else:
             plt.show()
 
     def plot_energy_vs_iteration():
-        fig = plt.figure(figsize=(8,8))        
+        fig = plt.figure(figsize=(8, 6))        
         ax = fig.add_subplot(111)
+
     
         for sim in f.values(): #Each sim corresponds to a simulation at some Temperature
             T = sim['temperature'][0]
-            M = sim['magnetization'][-1000:]
-            E = sim['energy'][-1000:]
-            iterations = sim['iterations'][-1000:]
+            E = sim['energy'][:100000]
+            iterations = sim['iterations'][:100000]
             ax.plot(iterations, E, label=str(T))
     
-        ax.set_xlabel('iteration')
+        ax.set_xlabel('time')
         ax.set_ylabel('E')
-        ax.legend(loc='best', prop={'size':8})
+        #ax.legend(loc='best', prop={'size':8})
 
         if not args.plot:
-            plt.savefig('figures/'+str(args.filename)+"E_vs_iters"+".png", bbox_inches='tight')
+            plt.savefig('figures/'+name+"_E_vs_time"+".png", bbox_inches='tight')
             fig.clf()
             plt.close()
         else:
@@ -122,16 +123,17 @@ def main():
             plt.show()
 
 
-    #plot_netmagnitization_vs_iteration()
-    #plot_energy_vs_iteration()
-    #plot_chi_vs_temperature()
+    plot_netmagnitization_vs_iteration()
+    plot_energy_vs_iteration()
 
-    plot_all_in_one()
+    #plot_chi_vs_temperature()
+    #plot_all_in_one(MCS0=args.points)
 
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('filename', metavar="HDF5 FILENAME")
     parser.add_argument('--plot', action='store_true')
+    parser.add_argument('--points', type=int, default=10000)
     args = parser.parse_args()
     return args
 
