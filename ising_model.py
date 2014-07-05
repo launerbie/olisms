@@ -7,7 +7,7 @@ import numpy as np
 
 class Ising(object):
     def __init__(self, rij=40, kolom=40, temperature=10, 
-                 handler=None, h5path=None, printit=None, aligned=False,
+                 handler=None, h5path=None, aligned=False,
                  mode='metropolis'):
         """ 
         Parameters
@@ -37,7 +37,6 @@ class Ising(object):
         self.total_energy = self.calc_energy()
         self.handler = handler 
         self.h5path = h5path 
-        self.printit = printit
         self.ptable = self.make_probability_table()
         
         if (self.handler and self.h5path) is not None:
