@@ -5,9 +5,8 @@ import os
 import argparse
 import numpy
 
-from ising_model import Ising
+from ising import Ising
 from hdf5utils import HDF5Handler
-
 
 def main():
     if os.path.exists(args.filename):
@@ -15,48 +14,27 @@ def main():
         exit(0)
     else:
         simulate()
-    
 
 def simulate():
     """
     Run several Ising model simulations with different temperatures.
     Store them in 1 hdf5 file.
 
-    The hdf5 file structure:
-
-    /
-    ├── sim_01
-    │   ├── bfield
-    │   ├── energy
-    │   ├── iterations
-    │   ├── magnetization
-    │   ├── sites
-    │   └── temperature
-    ├── sim_02
-    └── sim_03
-
-
     """
-    Tmin = args.tmin
-    Tmax = args.tmax
-    steps = args.steps
-    
-    temperatures = numpy.linspace(Tmin, Tmax, steps)
+    temperatures = numpy.linspace(args.tmin, args.tmax, args.steps)
 
     with HDF5Handler(args.filename) as handler:
         simcount = 0
-        indexwidth = len(str(steps))
         for T in temperatures:
             print(T)
-            sim_str = str(simcount).zfill(indexwidth)
+            sim_str = str(simcount).zfill(4)
             h5path = "/"+"sim_"+sim_str+"/"
-            i = Ising(args.x, args.y, temperature=T, handler=handler, 
-                      h5path=h5path, aligned=args.aligned)
-            i.evolve(args.iterations) #TODO:need better stopping condition
+            i = Ising(args.shape, temperature=T, handler=handler, 
+                      h5path=h5path, aligned=args.aligned, mode=args.algorithm)
+            i.evolve(args.iterations) 
 
             simcount += 1
             handler.file.flush()
-        
 
 def get_arguments():
     """
@@ -68,18 +46,16 @@ def get_arguments():
     parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'])
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000")
-    parser.add_argument('-b', '--bfield', default=0.00, type=float,
-                        help="Uniform external magnetic field, default: 0")
-    parser.add_argument('-y', default=40, type=int, help="number of columns")
-    parser.add_argument('-x', default=40, type=int, help="number of rows")
     parser.add_argument('-f', '--filename', required=True,
                         help="hdf5 output file name")
 
+    parser.add_argument('--shape', default=[40, 40], type=int, nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
-    parser.add_argument('--tmin', default=0.001, type=float)
-    parser.add_argument('--tmax', default=1000, type=float)
+    parser.add_argument('--tmin', default=0.1, type=float)
+    parser.add_argument('--tmax', default=10, type=float)
     parser.add_argument('--steps', default=5, type=float)
 
+    #if len(args.shape) < 2, abort
 
     args = parser.parse_args()
     return args
@@ -87,4 +63,5 @@ def get_arguments():
 
 if __name__ == "__main__":
     args = get_arguments()
+    print(args)
     main()

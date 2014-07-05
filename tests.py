@@ -5,14 +5,13 @@ import h5py
 import numpy
 import unittest
 
-import ising_model
+import ising
+import three_dim_ising
 from hdf5utils import HDF5Handler
 
 class test_calc_energy_periodic(unittest.TestCase):
     def setUp(self):
-        self.ising = ising_model.Ising()
-        self.ising.rij = 3 
-        self.ising.kolom = 3 
+        self.ising = ising.Ising(shape=[3,3])
 
     def test_calculation_total_energy(self):
         I = self.ising
@@ -103,10 +102,8 @@ class test_delta_energy_periodic_1(unittest.TestCase):
                                   [1,1,1],
                                   [1,1,1]])
 
-        self.ising = ising_model.Ising()
+        self.ising = ising.Ising(shape=[3,3])
         self.ising.grid = self.model
-        self.ising.rij = 3 
-        self.ising.kolom = 3 
 
     def test_flip_00(self):
         I = self.ising
@@ -151,15 +148,372 @@ class test_magnetization(unittest.TestCase):
                                   [1,1,1],
                                   [1,1,1]])
 
-        self.ising = ising_model.Ising()
+        self.ising = ising.Ising(shape=[3,3])
         self.ising.grid = self.model
-        self.ising.rij = 3 
-        self.ising.kolom = 3 
 
     def test_magnetization(self):
         I = self.ising
         self.assertEqual(I.magnetization, 3)
 
+########################################################################
+######################### TEST 3D ISING ################################
+########################################################################
+
+class test_3d_calc_energy(unittest.TestCase):
+    def setUp(self):
+        self.ising = ising.Ising(shape=[3,3,3])
+
+    def test_calculation_total_energy(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -81)
+
+###################### z = 0 ##########################
+    def test_calculation_total_energy_000(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,0,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_100(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,0,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_200(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,0,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_010(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,1,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_110(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,1,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_210(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,1,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_020(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,2,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_120(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,2,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_220(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,2,0] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+###################### z = 1 ##########################
+    def test_calculation_total_energy_001(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,0,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_101(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,0,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_201(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,0,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_011(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,1,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_111(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,1,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_211(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,1,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_021(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,2,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_121(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,2,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_221(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,2,1] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+###################### z = 2 ##########################
+    def test_calculation_total_energy_002(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,0,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_102(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,0,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_202(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,0,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_012(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,1,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_112(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,1,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_212(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,1,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_022(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[0,2,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_122(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[1,2,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+    def test_calculation_total_energy_222(self):
+        I = self.ising
+        model = numpy.ones((3,3,3))
+        model[2,2,2] = -1
+
+        I.grid = model
+        self.assertEqual(I.calc_energy(), -69)
+
+
+class test_delta_energy_3D(unittest.TestCase):
+    def setUp(self):
+        self.model = numpy.ones((3,3,3))
+        self.ising = ising.Ising(shape=[3,3,3])
+        self.ising.grid = self.model
+
+        self.ising.rij = 3
+        self.ising.kolom = 3
+        self.ising.diepte = 3
+
+###################### z = 0 ##########################
+    def test_flip_000(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,0,0)), 12)
+
+    def test_flip_100(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,0,0)), 12)
+
+    def test_flip_200(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,0,0)), 12)
+
+    def test_flip_010(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,1,0)), 12)
+
+    def test_flip_020(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,2,0)), 12)
+
+    def test_flip_110(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,1,0)), 12)
+
+    def test_flip_120(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,2,0)), 12)
+
+    def test_flip_210(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,1,0)), 12)
+
+    def test_flip_220(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,2,0)), 12)
+
+###################### z = 1 ##########################
+    def test_flip_001(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,0,1)), 12)
+
+    def test_flip_101(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,0,1)), 12)
+
+    def test_flip_201(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,0,1)), 12)
+
+    def test_flip_011(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,1,1)), 12)
+
+    def test_flip_021(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,2,1)), 12)
+
+    def test_flip_111(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,1,1)), 12)
+
+    def test_flip_121(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,2,1)), 12)
+
+    def test_flip_211(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,1,1)), 12)
+
+    def test_flip_221(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,2,1)), 12)
+
+###################### z = 2 ##########################
+    def test_flip_002(self):
+        I = self.ising 
+        self.assertEqual(I.delta_energy((0,0,2)), 12)
+
+    def test_flip_102(self):
+        I = self.ising    
+        self.assertEqual(I.delta_energy((1,0,2)), 12)
+
+    def test_flip_202(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,0,2)), 12)
+
+    def test_flip_012(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,1,2)), 12)
+
+    def test_flip_022(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((0,2,2)), 12)
+
+    def test_flip_112(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,1,2)), 12)
+
+    def test_flip_122(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((1,2,2)), 12)
+
+    def test_flip_212(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,1,2)), 12)
+
+    def test_flip_222(self):
+        I = self.ising
+        self.assertEqual(I.delta_energy((2,2,2)), 12)
+
+########################################################################
+######################### END OF 3D ISING TEST #########################
+########################################################################
 
 class test_HDF5Handler_ndarrays(unittest.TestCase):
     def setUp(self):
