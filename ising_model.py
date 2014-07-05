@@ -4,19 +4,9 @@ import shutil
 import argparse
 import numpy as np
 
-def main():
-    #TODO: remove main(). 
-    if args.full:
-        args.x = screensize.lines - 8 
-        args.y = (screensize.columns//2) -2
-    
-    i = Ising(args.x, args.y, args.bfield, args.temperature, 
-              printit=args.printit, mode=args.mode, aligned=args.aligned)
-
-    i.evolve(args.iterations)
 
 class Ising(object):
-    def __init__(self, rij=40, kolom=40, b_field=0.0, temperature=10, 
+    def __init__(self, rij=40, kolom=40, temperature=10, 
                  handler=None, h5path=None, printit=None, aligned=False,
                  mode='metropolis'):
         """ 
@@ -24,7 +14,6 @@ class Ising(object):
         ----------
         rij : number of rows in lattice
         kolom: number of columns in lattice
-        b_field: strength of the uniform b-field
         temperature: temperature 
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
@@ -44,7 +33,6 @@ class Ising(object):
         self.rij = rij
         self.kolom = kolom
         self.shape = (rij, kolom)
-        self.b_field = b_field
         self.temperature = temperature
         self.total_energy = self.calc_energy()
         self.handler = handler 
@@ -52,10 +40,8 @@ class Ising(object):
         self.printit = printit
         self.ptable = self.make_probability_table()
         
-
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
-            #self.handler.append(self.b_field, self.h5path+'bfield')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
 
@@ -65,25 +51,6 @@ class Ising(object):
         for dE in delta_energies:
             ptable.update({dE:np.exp(-dE/self.temperature)}) 
         return ptable
-
-
-    #deprecated
-    #@property
-    #def beta(self):
-    #    #kB = 1.3806488e-23 J K^-1
-    #    kB = 1
-    #    return 1.0/(kB*self.temperature)
-
-    #deprecated
-    #@property
-    #def bond_probability(self):
-    #    J = 1
-    #    kB =1
-    #    return 1 - np.exp(-2*J/(kB*self.temperature))
-
-    #deprecated
-    #def boltzmann(self, delta_energy):
-    #    return np.exp(-self.beta*delta_energy) 
 
     @property
     def magnetization(self):
@@ -112,12 +79,9 @@ class Ising(object):
             grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
             return np.array(grid, dtype='int8')
         
-    def neighbors(self, site, boundary='periodic'):
+    def neighbors(self, site):
         """
-        TODO: return neighbors based on boundary argument.
-      
-        Returns a list of sites which are the neighbors of 'site' based on
-        the boundary condition.
+        Returns a list of sites which are the neighbors of 'site'.
 
         Return
         ------
@@ -188,7 +152,7 @@ class Ising(object):
 
         """
         g = self.grid
-        energy = self.b_field * self.magnetization
+        energy = 0
 
         for site, value in np.ndenumerate(g):
             below, above, right, left = self.neighbors(site)
@@ -236,23 +200,11 @@ class Ising(object):
             site = self.choose_site() 
             delta_e = self.delta_energy(site) 
             probability = self.ptable[delta_e]
-            #probability = self.boltzmann(delta_e) #deprecated
             flipped = self.flip(probability, site) 
             
             if flipped and delta_e != 0:
                 flipcount += 1 
                 self.total_energy = self.total_energy + delta_e
-
-            if self.printit is not None:
-                if i % self.printit == 0 :
-                    self.printlattice()
-                    print("Temperature    : {}".format(self.temperature))
-                    print("B-Field        : {}".format(self.b_field))
-                    print("Iterations     : {}".format(i))
-                    print("Energy         : {}".format(self.total_energy))
-                    print("Magnetization  : {}".format(self.magnetization))
-                    print("flips/iters    : {}/{}".format(flipcount, i))
-                    print("x/y    : {}/{}".format(self.rij, self.kolom))
 
             if self.handler is not None and self.h5path is not None:
                 self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
@@ -309,18 +261,6 @@ class Ising(object):
             #flip cluster
             g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
 
-            if self.printit is not None:
-                if i % self.printit == 0 :
-                    self.printlattice()
-                    print("Temperature      : {}".format(self.temperature))
-                    print("B-Field          : {}".format(self.b_field))
-                    #print("Bond Probability : {}".format(self.bond_probability))
-                    print("Bond Probability : {}".format(bond_probability))
-                    print("Iterations       : {}".format(i))
-                    print("Energy           : {}".format(self.total_energy))
-                    print("Magnetization    : {}".format(self.magnetization))
-                    print("x/y    : {}/{}".format(self.rij, self.kolom))
-
             if self.handler is not None and self.h5path is not None:
                 self.handler.append(i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
@@ -328,37 +268,25 @@ class Ising(object):
 
             i += 1
 
-    def printlattice(self):
-        """ Prints the lattice. """
-        g = self.grid
-        str_ising = np.empty(g.size, dtype='int8').reshape(g.shape)
-        str_ising[ np.where(g == 1) ] = 1 
-        str_ising[ np.where(g == -1) ] = 8 
-        print(str_ising)
 
 def get_arguments():
-    """
-    To add arguments, call: parser.add_argument
-    
-    """
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000") 
+
     parser.add_argument('-T', '--temperature', default=0.001, type=float,
                         help="The Temperature") 
-    parser.add_argument('-b', '--bfield', default=0.00, type=float,
-                        help="Uniform external magnetic field, default: 0") 
+
     parser.add_argument('-y', default=40,type=int, help="number of columns") 
+
     parser.add_argument('-x', default=40,type=int, help="number of rows") 
-    parser.add_argument('-p', '--printit', default=None, type=int,
-                        help="Print lattice every p flips") 
+
     parser.add_argument('--aligned', action='store_true')
+
     parser.add_argument('--mode', default='metropolis', choices=['metropolis','wolff'],
                         help="Evolve with this algorithm.") 
    
-    parser.add_argument('--full', action='store_true', help="Set lattice size\
-                        such that it fills the terminal screen")
     parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args()
@@ -367,8 +295,6 @@ def get_arguments():
 
 if __name__ == "__main__":
     args = get_arguments()
-    screensize = shutil.get_terminal_size(fallback=(80, 80))
-    np.set_printoptions(threshold=np.nan, linewidth= 340)
     print(args)
     main()
 
