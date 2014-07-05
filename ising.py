@@ -4,6 +4,12 @@ import shutil
 import argparse
 import numpy as np
 
+def prod( iterable ):
+    p = 1
+    for n in iterable:
+        p *= n
+    return p
+
 class Ising(object):
     def __init__(self, shape, temperature=10, aligned=False, mode='metropolis',
                  handler=None, h5path=None):
@@ -48,9 +54,12 @@ class Ising(object):
         self.handler = handler 
         self.h5path = h5path 
         self.ptable = self.make_probability_table()
+
+        self.lattice_size = prod(self.shape)
         
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
+            self.handler.append(self.lattice_size, self.h5path+'lattice_size')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
 
