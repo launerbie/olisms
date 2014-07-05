@@ -123,11 +123,11 @@ def main():
             plt.show()
 
 
-    plot_netmagnitization_vs_iteration()
-    plot_energy_vs_iteration()
+    #plot_netmagnitization_vs_iteration()
+    #plot_energy_vs_iteration()
 
     #plot_chi_vs_temperature()
-    #plot_all_in_one(MCS0=args.points)
+    plot_all_in_one(MCS0=args.points)
 
 def get_arguments():
     parser = argparse.ArgumentParser()

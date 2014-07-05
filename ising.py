@@ -4,21 +4,17 @@ import shutil
 import argparse
 import numpy as np
 
-
 class Ising(object):
-    def __init__(self, rij=40, kolom=40, temperature=10, 
-                 handler=None, h5path=None, aligned=False,
-                 mode='metropolis'):
+    def __init__(self, shape, temperature=10, aligned=False, mode='metropolis',
+                 handler=None, h5path=None):
         """ 
         Parameters
         ----------
-        rij : number of rows in lattice
-        kolom: number of columns in lattice
+        shape : lattice shape 
         temperature: temperature 
+        mode : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
-        initgrid: set an initial ndarray as grid
-        mode : algorithm to use. Choices are: ['metropolis', 'wolff']
     
         """
         if mode == 'metropolis':
@@ -28,11 +24,25 @@ class Ising(object):
         else:
             raise ValueError("Unknown mode")
 
-        self.grid = self.makegrid(rij, kolom, aligned=aligned)
 
-        self.rij = rij
-        self.kolom = kolom
-        self.shape = (rij, kolom)
+        self.shape = tuple(shape)
+        self.dimension = len(shape)
+
+        if self.dimension == 2:
+            self.neighbors = self.neighbors_2D
+            self.choose_site = self.choose_site_2D
+            self.delta_energy = self.delta_energy_2D
+            self.calc_energy = self.calc_energy_2D
+        elif self.dimension == 3:
+            self.neighbors = self.neighbors_3D
+            self.choose_site = self.choose_site_3D
+            self.delta_energy = self.delta_energy_3D
+            self.calc_energy = self.calc_energy_3D
+        else:
+            raise ValueError("Unsupported dimension")
+
+
+        self.grid = self.makegrid(aligned=aligned)
         self.temperature = temperature
         self.total_energy = self.calc_energy()
         self.handler = handler 
@@ -44,105 +54,142 @@ class Ising(object):
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
 
+    @property
+    def magnetization(self):
+        return self.grid.sum()
+
     def make_probability_table(self):
-        delta_energies = [-8, -4, 0, 4, 8] #TODO: un-hardcode
+        if self.dimension == 2:
+            delta_energies = [-8, -4, 0, 4, 8] 
+        elif self.dimension == 3:
+            delta_energies = [-12, -8, -4, 0, 4, 8, 12]  
+        else:
+            raise ValueError("No probability table for lattice dimension {}".format(self.dimension))
+
         ptable = dict() 
         for dE in delta_energies:
             ptable.update({dE:np.exp(-dE/self.temperature)}) 
         return ptable
 
-    @property
-    def magnetization(self):
-        return self.grid.sum()
-
-    def choose_site(self):
-        """
-        Randomly chooses site to flip
-        """
-        #TODO: 3D array
-        site_x = np.random.randint(0,self.rij)
-        site_y = np.random.randint(0,self.kolom)
-        
+    def choose_site_2D(self):
+        site_x = np.random.randint(0, self.shape[0])
+        site_y = np.random.randint(0, self.shape[1])
         return site_x, site_y
 
-    def makegrid(self, x, y, aligned=False):
+    def choose_site_3D(self):
+        site_x = np.random.randint(0, self.shape[0])
+        site_y = np.random.randint(0, self.shape[1])
+        site_z = np.random.randint(0, self.shape[2])
+        return site_x, site_y, site_z
+
+    def makegrid(self, aligned=False):
         """ 
-        Function that makes a numpy array with x rows and y columns and fills 
-        the entries randomly with '1' or '-1'
         If aligned = True, a grid of ones is returned.
         """
         if aligned:
-            grid = np.ones((x, y))
+            grid = np.ones(self.shape)
             return np.array(grid, dtype='int8')
         else:
-            grid = np.random.choice([-1, 1], size=x*y).reshape(x, y)
+            grid = np.random.choice([-1, 1], size=self.shape)
             return np.array(grid, dtype='int8')
-        
-    def neighbors(self, site):
-        """
-        Returns a list of sites which are the neighbors of 'site'.
 
-        Return
-        ------
-        tuple: (below nbr), (above nbr), (right nbr), (left nbr)
-        
-        Here: "below", "above", "right" and "left" mean:
-
-                   j-1         j         j+1
-
-                ---------------------------------
-        i-1     |        |    above   |         |
-                |        |            |         |
-                ---------------------------------
-         i      |  left  |    site    |  right  |
-                |        |   (i, j)   |         |
-                ---------------------------------
-        i+1     |        |            |         |
-                |        |    below   |         |
-                ---------------------------------
-
-
-        So if you consider the ndarray a=numpy.arange(9).reshape(3,3):
-
-                >>> a
-                array([[0, 1, 2],
-                       [3, 4, 5],
-                       [6, 7, 8]])
-                >>> print(a[0,0], a[1,1], a[2,2])
-                0 4 8
-
-        Then the left neighbor of 4 is 3.
-
-        """
-        LR = self.rij - 1
-        LK = self.kolom - 1
+    def neighbors_2D(self, site):
         i, j = site
-        if not (i == 0 or i == LR or j == 0 or j == LK): # dan niet rand  
-            nbrs = (i+1, j), (i-1, j), (i, j+1), (i, j-1)
-        else: #dan rand
-            if not ((i == 0 and (j == 0 or j == LK)) or\
-                    (i == LR and (j == 0 or j == LK))): #dan niet hoek
-                if i == 0:
-                    nbrs = (i+1, j), (LR, j), (i, j+1), (i, j-1)
-                elif i == LR:
-                    nbrs = (0, j), (i-1, j), (i, j+1), (i, j-1)
-                elif j == 0:
-                    nbrs = (i+1, j), (i-1, j), (i, j+1), (i, LK)
-                else:
-                    nbrs = (i+1, j), (i-1, j), (i, 0), (i, j-1)
-            else: # dan hoek
-                if (i == 0 and j == 0):
-                    nbrs = (i+1, j), (LR, j), (i, j+1), (i, LK)
-                elif (i == 0 and j == LK):
-                    nbrs = (i+1, j), (LR, j), (i, 0), (i, j-1)
-                elif (i == LR and j == 0):
-                    nbrs = (0, j), (i-1, j), (i, j+1), (i, LK)
-                else:
-                    nbrs = (0, j), (i-1, j), (i, 0), (i, j-1)
+        ROW = self.shape[0]
+        COL = self.shape[1]
+
+        left = (j + COL - 1) % COL
+        right = (j + 1) % COL
+        above = (i + ROW - 1) % ROW
+        below = (i + 1) % ROW
+
+        nbrs = (below, j), (above, j), (i, right), (i, left)
         return nbrs
 
+    def neighbors_3D(self, site):
+        i, j, k = site
 
-    def calc_energy(self): 
+        ROW = self.shape[0]
+        COL = self.shape[1]
+        DEP = self.shape[2]
+
+        left = (j + COL - 1) % COL 
+        right = (j + 1) % COL 
+        above = (i + ROW - 1) % ROW
+        below = (i + 1) % ROW
+
+        front = (k + DEP - 1) % DEP
+        back = (i + 1) % DEP
+
+        nbrs = (below, j, k), (above, j, k), (i, right, k), (i, left, k), (i, j, back), (i, j, front)
+        return nbrs
+
+        
+    #def neighbors(self, site):
+    #    """
+    #    Returns a list of sites which are the neighbors of 'site'.
+
+    #    Return
+    #    ------
+    #    tuple: (below nbr), (above nbr), (right nbr), (left nbr)
+    #    
+    #    Here: "below", "above", "right" and "left" mean:
+
+    #               j-1         j         j+1
+
+    #            ---------------------------------
+    #    i-1     |        |    above   |         |
+    #            |        |            |         |
+    #            ---------------------------------
+    #     i      |  left  |    site    |  right  |
+    #            |        |   (i, j)   |         |
+    #            ---------------------------------
+    #    i+1     |        |            |         |
+    #            |        |    below   |         |
+    #            ---------------------------------
+
+
+    #    So if you consider the ndarray a=numpy.arange(9).reshape(3,3):
+
+    #            >>> a
+    #            array([[0, 1, 2],
+    #                   [3, 4, 5],
+    #                   [6, 7, 8]])
+    #            >>> print(a[0,0], a[1,1], a[2,2])
+    #            0 4 8
+
+    #    Then the left neighbor of 4 is 3.
+
+    #    """
+    #    LR = self.rij - 1
+    #    LK = self.kolom - 1
+    #    i, j = site
+    #    if not (i == 0 or i == LR or j == 0 or j == LK): # dan niet rand  
+    #        nbrs = (i+1, j), (i-1, j), (i, j+1), (i, j-1)
+    #    else: #dan rand
+    #        if not ((i == 0 and (j == 0 or j == LK)) or\
+    #                (i == LR and (j == 0 or j == LK))): #dan niet hoek
+    #            if i == 0:
+    #                nbrs = (i+1, j), (LR, j), (i, j+1), (i, j-1)
+    #            elif i == LR:
+    #                nbrs = (0, j), (i-1, j), (i, j+1), (i, j-1)
+    #            elif j == 0:
+    #                nbrs = (i+1, j), (i-1, j), (i, j+1), (i, LK)
+    #            else:
+    #                nbrs = (i+1, j), (i-1, j), (i, 0), (i, j-1)
+    #        else: # dan hoek
+    #            if (i == 0 and j == 0):
+    #                nbrs = (i+1, j), (LR, j), (i, j+1), (i, LK)
+    #            elif (i == 0 and j == LK):
+    #                nbrs = (i+1, j), (LR, j), (i, 0), (i, j-1)
+    #            elif (i == LR and j == 0):
+    #                nbrs = (0, j), (i-1, j), (i, j+1), (i, LK)
+    #            else:
+    #                nbrs = (0, j), (i-1, j), (i, 0), (i, j-1)
+    #    return nbrs
+
+
+    def calc_energy_2D(self): 
         """
         Function that iterates through the ising array and calculates product 
         of its value with right and lower neighbor. Boundary conditions link 
@@ -159,8 +206,24 @@ class Ising(object):
 
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
+    def calc_energy_3D(self):
+        """
+        Function that iterates through the ising array and calculates product 
+        of its value with right and lower neighbor. Boundary conditions link 
+        last entry in row with first in row and last entry in column with 
+        first in column (torus).
 
-    def delta_energy(self, site):
+        """
+        g = self.grid
+        energy = 0 
+        for site, value in np.ndenumerate(g):
+            below, above, right, left, back, front = self.neighbors(site)
+            energy = energy + g[site]*( g[right] + g[below] + g[front])
+
+        return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
+
+
+    def delta_energy_2D(self, site):
         """
         Berekent verandering in energie als gevolg van het omdraaien van het 
         teken (spin flip) op de positie "site".
@@ -170,6 +233,17 @@ class Ising(object):
         below, above, right, left = self.neighbors(site)
         d_energy = -2*(-g[site] * (g[below] + g[above] +g[right] +g[left]))
         return d_energy  
+
+
+    def delta_energy_3D(self, site):
+        """
+        Berekent verandering in energie als gevolg van het omdraaien van het 
+        teken (spin flip) op de positie "site".
+        """
+        g = self.grid
+        below, above, right, left, back, front = self.neighbors(site)
+        d_energy = -2*(-g[site] * (g[below] + g[above] + g[right] + g[left] + g[back] + g[front]))
+        return d_energy
 
     
     def flip(self, prob, site):
@@ -267,33 +341,4 @@ class Ising(object):
 
             i += 1
 
-
-def get_arguments():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument('-i', '--iterations', default=100000, type=int,
-                        help="Number of iterations, default: 100000") 
-
-    parser.add_argument('-T', '--temperature', default=0.001, type=float,
-                        help="The Temperature") 
-
-    parser.add_argument('-y', default=40,type=int, help="number of columns") 
-
-    parser.add_argument('-x', default=40,type=int, help="number of rows") 
-
-    parser.add_argument('--aligned', action='store_true')
-
-    parser.add_argument('--mode', default='metropolis', choices=['metropolis','wolff'],
-                        help="Evolve with this algorithm.") 
-   
-    parser.add_argument('-v', '--verbose', action='store_true')
-
-    args = parser.parse_args()
-    return args
-
-
-if __name__ == "__main__":
-    args = get_arguments()
-    print(args)
-    main()
 

@@ -5,15 +5,13 @@ import h5py
 import numpy
 import unittest
 
-import ising_model
+import ising
 import three_dim_ising
 from hdf5utils import HDF5Handler
 
 class test_calc_energy_periodic(unittest.TestCase):
     def setUp(self):
-        self.ising = ising_model.Ising()
-        self.ising.rij = 3 
-        self.ising.kolom = 3 
+        self.ising = ising.Ising(shape=[3,3])
 
     def test_calculation_total_energy(self):
         I = self.ising
@@ -104,10 +102,8 @@ class test_delta_energy_periodic_1(unittest.TestCase):
                                   [1,1,1],
                                   [1,1,1]])
 
-        self.ising = ising_model.Ising()
+        self.ising = ising.Ising(shape=[3,3])
         self.ising.grid = self.model
-        self.ising.rij = 3 
-        self.ising.kolom = 3 
 
     def test_flip_00(self):
         I = self.ising
@@ -152,10 +148,8 @@ class test_magnetization(unittest.TestCase):
                                   [1,1,1],
                                   [1,1,1]])
 
-        self.ising = ising_model.Ising()
+        self.ising = ising.Ising(shape=[3,3])
         self.ising.grid = self.model
-        self.ising.rij = 3 
-        self.ising.kolom = 3 
 
     def test_magnetization(self):
         I = self.ising
@@ -167,10 +161,7 @@ class test_magnetization(unittest.TestCase):
 
 class test_3d_calc_energy(unittest.TestCase):
     def setUp(self):
-        self.ising = three_dim_ising.Ising()
-        self.ising.rij = 3
-        self.ising.kolom = 3
-        self.ising.diepte = 3
+        self.ising = ising.Ising(shape=[3,3,3])
 
     def test_calculation_total_energy(self):
         I = self.ising
@@ -402,7 +393,7 @@ class test_3d_calc_energy(unittest.TestCase):
 class test_delta_energy_3D(unittest.TestCase):
     def setUp(self):
         self.model = numpy.ones((3,3,3))
-        self.ising = three_dim_ising.Ising()
+        self.ising = ising.Ising(shape=[3,3,3])
         self.ising.grid = self.model
 
         self.ising.rij = 3
