@@ -6,7 +6,6 @@ import numpy
 import unittest
 
 import ising
-import three_dim_ising
 from hdf5utils import HDF5Handler
 
 class test_calc_energy_periodic(unittest.TestCase):
