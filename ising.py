@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import shutil
-import argparse
 import numpy as np
 
 def prod( iterable ):
@@ -18,11 +16,21 @@ class Ising(object):
         ----------
         shape : lattice shape 
         temperature: temperature 
+        aligned: create grid with all spins in the same direction
         mode : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
     
         """
+        self.shape = tuple(shape)
+        self.dimension = len(shape)
+        self.temperature = temperature
+        self.handler = handler 
+        self.h5path = h5path 
+        self.ptable = self.make_probability_table()
+
+        self.lattice_size = prod(self.shape)
+
         if mode == 'metropolis':
             self.evolve = self.evolve_metropolis
         elif mode == 'wolff':
@@ -30,9 +38,6 @@ class Ising(object):
         else:
             raise ValueError("Unknown mode")
 
-
-        self.shape = tuple(shape)
-        self.dimension = len(shape)
 
         if self.dimension == 2:
             self.neighbors = self.neighbors_2D
@@ -48,20 +53,20 @@ class Ising(object):
             raise ValueError("Unsupported dimension")
 
 
-        self.grid = self.makegrid(aligned=aligned)
-        self.temperature = temperature
+        if aligned:
+            self.grid = np.ones(self.shape, dtype='int8')
+        else:
+            grid = np.random.choice([-1, 1], size=self.shape)
+            self.grid = np.array(grid, dtype='int8')
+        
         self.total_energy = self.calc_energy()
-        self.handler = handler 
-        self.h5path = h5path 
-        self.ptable = self.make_probability_table()
-
-        self.lattice_size = prod(self.shape)
         
         if (self.handler and self.h5path) is not None:
             self.handler.append(self.temperature, self.h5path+'temperature')
             self.handler.append(self.lattice_size, self.h5path+'lattice_size')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
+
 
     @property
     def magnetization(self):
@@ -90,17 +95,6 @@ class Ising(object):
         site_y = np.random.randint(0, self.shape[1])
         site_z = np.random.randint(0, self.shape[2])
         return site_x, site_y, site_z
-
-    def makegrid(self, aligned=False):
-        """ 
-        If aligned = True, a grid of ones is returned.
-        """
-        if aligned:
-            grid = np.ones(self.shape)
-            return np.array(grid, dtype='int8')
-        else:
-            grid = np.random.choice([-1, 1], size=self.shape)
-            return np.array(grid, dtype='int8')
 
     def neighbors_2D(self, site):
         i, j = site
@@ -132,71 +126,6 @@ class Ising(object):
 
         nbrs = (below, j, k), (above, j, k), (i, right, k), (i, left, k), (i, j, back), (i, j, front)
         return nbrs
-
-        
-    #def neighbors(self, site):
-    #    """
-    #    Returns a list of sites which are the neighbors of 'site'.
-
-    #    Return
-    #    ------
-    #    tuple: (below nbr), (above nbr), (right nbr), (left nbr)
-    #    
-    #    Here: "below", "above", "right" and "left" mean:
-
-    #               j-1         j         j+1
-
-    #            ---------------------------------
-    #    i-1     |        |    above   |         |
-    #            |        |            |         |
-    #            ---------------------------------
-    #     i      |  left  |    site    |  right  |
-    #            |        |   (i, j)   |         |
-    #            ---------------------------------
-    #    i+1     |        |            |         |
-    #            |        |    below   |         |
-    #            ---------------------------------
-
-
-    #    So if you consider the ndarray a=numpy.arange(9).reshape(3,3):
-
-    #            >>> a
-    #            array([[0, 1, 2],
-    #                   [3, 4, 5],
-    #                   [6, 7, 8]])
-    #            >>> print(a[0,0], a[1,1], a[2,2])
-    #            0 4 8
-
-    #    Then the left neighbor of 4 is 3.
-
-    #    """
-    #    LR = self.rij - 1
-    #    LK = self.kolom - 1
-    #    i, j = site
-    #    if not (i == 0 or i == LR or j == 0 or j == LK): # dan niet rand  
-    #        nbrs = (i+1, j), (i-1, j), (i, j+1), (i, j-1)
-    #    else: #dan rand
-    #        if not ((i == 0 and (j == 0 or j == LK)) or\
-    #                (i == LR and (j == 0 or j == LK))): #dan niet hoek
-    #            if i == 0:
-    #                nbrs = (i+1, j), (LR, j), (i, j+1), (i, j-1)
-    #            elif i == LR:
-    #                nbrs = (0, j), (i-1, j), (i, j+1), (i, j-1)
-    #            elif j == 0:
-    #                nbrs = (i+1, j), (i-1, j), (i, j+1), (i, LK)
-    #            else:
-    #                nbrs = (i+1, j), (i-1, j), (i, 0), (i, j-1)
-    #        else: # dan hoek
-    #            if (i == 0 and j == 0):
-    #                nbrs = (i+1, j), (LR, j), (i, j+1), (i, LK)
-    #            elif (i == 0 and j == LK):
-    #                nbrs = (i+1, j), (LR, j), (i, 0), (i, j-1)
-    #            elif (i == LR and j == 0):
-    #                nbrs = (0, j), (i-1, j), (i, j+1), (i, LK)
-    #            else:
-    #                nbrs = (0, j), (i-1, j), (i, 0), (i, j-1)
-    #    return nbrs
-
 
     def calc_energy_2D(self): 
         """
@@ -256,7 +185,14 @@ class Ising(object):
 
     
     def flip(self, prob, site):
-        """ Flip 'site' with probability 'prob'."""
+        """ 
+        Flip 'site' with probability 'prob'.
+
+        Parameters
+        ----------
+        prob: probability 
+        site: tuple (e.g. (i,j) if 2D, (i,j,k) if 3D)
+        """
         determinant = np.random.ranf() #random flt from uniform distr (0,1).
 
         if prob >= 1:

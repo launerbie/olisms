@@ -5,15 +5,48 @@ import os
 import argparse
 import numpy
 
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+#import matplotlib.gridspec as gridspec
+from matplotlib import animation
+
 from ising import Ising
 from hdf5utils import HDF5Handler
 
 def main():
-    if os.path.exists(args.filename):
-        print("{} already exists. Aborting.".format(args.filename))
-        exit(0)
+    if args.filename:
+        if os.path.exists(args.filename):
+            print("{} already exists. Aborting.".format(args.filename))
+            exit(0)
+        else:
+            simulate()
+
+    elif args.animate:
+        animate_evolution()
+
     else:
-        simulate()
+        pass #abort nicely
+    
+
+def animate_evolution():
+    temperatures = numpy.linspace(args.tmin, args.tmax, args.steps)
+    for T in temperatures:
+        print(T)
+
+        i = Ising(args.shape, temperature=T, aligned=args.aligned, 
+                  mode=args.algorithm)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        im = ax.imshow(i.grid, interpolation='None', cmap=mpl.cm.binary))
+
+        i.evolve(args.iterations) 
+
+        anim = animation.FuncAnimation(fig, animate, frames=1200,
+                   interval=20, blit=True, save_count=0)
+
 
 def simulate():
     """
@@ -36,6 +69,7 @@ def simulate():
             simcount += 1
             handler.file.flush()
 
+
 def get_arguments():
     """
     To add arguments, call: parser.add_argument
@@ -43,13 +77,13 @@ def get_arguments():
     """
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('-f', '--filename', help="hdf5 output file name")
+    parser.add_argument('--animate', action='store_true')
     parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'])
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000")
-    parser.add_argument('-f', '--filename', required=True,
-                        help="hdf5 output file name")
-
-    parser.add_argument('--shape', default=[40, 40], type=int, nargs='+', help="Lattice size")
+    parser.add_argument('--shape', default=[40, 40], type=int, 
+                        nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
     parser.add_argument('--tmin', default=0.1, type=float)
     parser.add_argument('--tmax', default=10, type=float)
