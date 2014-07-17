@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import time
 import numpy as np
 
 def prod( iterable ):
@@ -207,14 +207,15 @@ class Ising(object):
                 return False
 
         
-    def evolve_metropolis(self, iterations):
+    def evolve_metropolis(self, iterations, sleep=0):
         """
         Evolve it using Metropolis.
         """
-        i = 0
+        self.i = 0
         flipcount = 0
          
-        while i < iterations:
+        while self.i < iterations:
+            time.sleep(sleep)
             site = self.choose_site() 
             delta_e = self.delta_energy(site) 
             probability = self.ptable[delta_e]
@@ -226,14 +227,14 @@ class Ising(object):
 
             if self.handler is not None and self.h5path is not None:
                 self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
-                self.handler.append(i, self.h5path+'iterations', dtype='int64')
+                self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
                 self.handler.append(self.magnetization, self.h5path+'magnetization')
 
-            i = i + 1
+            self.i += 1
 
 
-    def evolve_wolff(self, iterations):
+    def evolve_wolff(self, iterations, sleep=0):
         """
         Ewolve it using Wolff's algorithm.
         """
@@ -243,8 +244,9 @@ class Ising(object):
         kB = 1
         bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
 
-        i=0
-        while i < iterations:
+        self.i=0
+        while self.i < iterations:
+            time.sleep(sleep)
             self.total_energy = self.calc_energy()
 
             cluster = list()
@@ -280,10 +282,10 @@ class Ising(object):
             g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
 
             if self.handler is not None and self.h5path is not None:
-                self.handler.append(i, self.h5path+'iterations', dtype='int64')
+                self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
                 self.handler.append(self.magnetization, self.h5path+'magnetization')
 
-            i += 1
+            self.i += 1
 
 
