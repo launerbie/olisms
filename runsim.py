@@ -8,12 +8,18 @@ import numpy
 from ising import Ising
 from hdf5utils import HDF5Handler
 
+
 def main():
-    if os.path.exists(args.filename):
-        print("{} already exists. Aborting.".format(args.filename))
-        exit(0)
+    if args.filename:
+        if os.path.exists(args.filename):
+            print("{} already exists. Aborting.".format(args.filename))
+            exit(0)
+        else:
+            simulate()
+
     else:
-        simulate()
+        pass #abort with message
+    
 
 def simulate():
     """
@@ -36,6 +42,7 @@ def simulate():
             simcount += 1
             handler.file.flush()
 
+
 def get_arguments():
     """
     To add arguments, call: parser.add_argument
@@ -43,13 +50,12 @@ def get_arguments():
     """
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('-f', '--filename', help="hdf5 output file name")
     parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'])
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000")
-    parser.add_argument('-f', '--filename', required=True,
-                        help="hdf5 output file name")
-
-    parser.add_argument('--shape', default=[40, 40], type=int, nargs='+', help="Lattice size")
+    parser.add_argument('--shape', default=[40, 40], type=int, 
+                        nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
     parser.add_argument('--tmin', default=0.1, type=float)
     parser.add_argument('--tmax', default=10, type=float)
