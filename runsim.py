@@ -36,7 +36,8 @@ def simulate():
             sim_str = str(simcount).zfill(4)
             h5path = "/"+"sim_"+sim_str+"/"
             i = Ising(args.shape, temperature=T, handler=handler, 
-                      h5path=h5path, aligned=args.aligned, mode=args.algorithm)
+                      h5path=h5path, aligned=args.aligned, mode=args.algorithm,
+                      saveinterval=args.saveinterval)
             i.evolve(args.iterations) 
 
             simcount += 1
@@ -60,6 +61,7 @@ def get_arguments():
     parser.add_argument('--tmin', default=0.1, type=float)
     parser.add_argument('--tmax', default=10, type=float)
     parser.add_argument('--steps', default=5, type=float)
+    parser.add_argument('--saveinterval', default=10000, type=int)
 
     #if len(args.shape) < 2, abort
 
