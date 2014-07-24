@@ -10,7 +10,7 @@ def prod( iterable ):
 
 class Ising(object):
     def __init__(self, shape, temperature=10, aligned=False, mode='metropolis',
-                 handler=None, h5path=None):
+                 handler=None, h5path=None, saveinterval=1):
         """ 
         Parameters
         ----------
@@ -20,6 +20,7 @@ class Ising(object):
         mode : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
+        saveinterval: iteration interval at which data is saved to hdf5
     
         """
         self.shape = tuple(shape)
@@ -27,6 +28,7 @@ class Ising(object):
         self.temperature = temperature
         self.handler = handler 
         self.h5path = h5path 
+        self.saveinterval = saveinterval
         self.ptable = self.make_probability_table()
 
         self.lattice_size = prod(self.shape)
@@ -61,12 +63,14 @@ class Ising(object):
         
         self.total_energy = self.calc_energy()
         
-        if (self.handler and self.h5path) is not None:
+        if (self.handler and self.h5path):
+            self.writehdf5 = True
             self.handler.append(self.temperature, self.h5path+'temperature')
             self.handler.append(self.lattice_size, self.h5path+'lattice_size')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
-
+        else:
+            self.writehdf5 = False
 
     @property
     def magnetization(self):
@@ -212,7 +216,6 @@ class Ising(object):
         Evolve it using Metropolis.
         """
         self.i = 0
-        flipcount = 0
          
         while self.i < iterations:
             time.sleep(sleep)
@@ -222,11 +225,9 @@ class Ising(object):
             flipped = self.flip(probability, site) 
             
             if flipped and delta_e != 0:
-                flipcount += 1 
                 self.total_energy = self.total_energy + delta_e
 
-            if self.handler is not None and self.h5path is not None:
-                self.handler.append(np.array(site), self.h5path+'sites', dtype='int16')
+            if self.writehdf5 and self.i % self.saveinterval == 0:
                 self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
                 self.handler.append(self.magnetization, self.h5path+'magnetization')
@@ -281,7 +282,7 @@ class Ising(object):
             #flip cluster
             g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
 
-            if self.handler is not None and self.h5path is not None:
+            if self.writehdf5 and self.i % self.saveinterval == 0:
                 self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
                 self.handler.append(self.total_energy, self.h5path+'energy')
                 self.handler.append(self.magnetization, self.h5path+'magnetization')
