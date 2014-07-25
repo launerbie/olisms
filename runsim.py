@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import argparse
 import numpy
 
@@ -10,15 +11,27 @@ from hdf5utils import HDF5Handler
 
 
 def main():
-    if args.filename:
-        if os.path.exists(args.filename):
-            print("{} already exists. Aborting.".format(args.filename))
-            exit(0)
-        else:
-            simulate()
+    if os.path.exists(args.filename):
+        pythonversion = sys.version_info[0]
 
+        key = None
+        while key not in ['y', 'n']:
+
+            if pythonversion == 2:
+                key = raw_input("{} exists. Overwrite? y/n: ".format(args.filename))
+            else:
+                key = input("{} exists. Overwrite? y/n: ".format(args.filename))
+
+            if key == 'y':
+                os.remove(args.filename)
+                simulate()
+            elif key == 'n':
+                print("Aborting runsim.py")
+                exit(0)
+            else:
+                print("Please input 'y' or 'n'\n")
     else:
-        pass #abort with message
+        simulate()
     
 
 def simulate():
@@ -45,14 +58,10 @@ def simulate():
 
 
 def get_arguments():
-    """
-    To add arguments, call: parser.add_argument
-    
-    """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-f', '--filename', help="hdf5 output file name")
-    parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'])
+    parser.add_argument('-f', '--filename', help="hdf5 output file name", required=True)
+    parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'], required=True)
     parser.add_argument('-i', '--iterations', default=100000, type=int,
                         help="Number of iterations, default: 100000")
     parser.add_argument('--shape', default=[40, 40], type=int, 
@@ -63,13 +72,10 @@ def get_arguments():
     parser.add_argument('--steps', default=5, type=float)
     parser.add_argument('--saveinterval', default=10000, type=int)
 
-    #if len(args.shape) < 2, abort
-
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
     args = get_arguments()
-    print(args)
     main()

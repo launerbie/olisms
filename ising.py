@@ -173,8 +173,8 @@ class Ising(object):
         """
         g = self.grid
         below, above, right, left = self.neighbors(site)
-        d_energy = -2*(-g[site] * (g[below] + g[above] +g[right] +g[left]))
-        return d_energy  
+        d_energy = np.int8(-2)*(-g[site] * (g[below] + g[above] +g[right] +g[left]))
+        return int(d_energy)
 
 
     def delta_energy_3D(self, site):
@@ -184,8 +184,8 @@ class Ising(object):
         """
         g = self.grid
         below, above, right, left, back, front = self.neighbors(site)
-        d_energy = -2*(-g[site] * (g[below] + g[above] + g[right] + g[left] + g[back] + g[front]))
-        return d_energy
+        d_energy = np.int8(-2)*(-g[site] * (g[below] + g[above] + g[right] + g[left] + g[back] + g[front]))
+        return int(d_energy)
 
     
     def flip(self, prob, site):
