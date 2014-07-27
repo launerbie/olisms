@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-# name: hdf5utils.py
+# hdf5utils.py
+# -*- coding: utf-8 -*-
 
 import h5py
 import numpy 

@@ -144,6 +144,8 @@ class Ising(object):
 
         for site, value in np.ndenumerate(g):
             below, above, right, left = self.neighbors(site)
+            #TODO: rather than performing this arithmetic, 
+            # get energy from table
             energy = energy + g[site]*( g[right] + g[below] )
 
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
@@ -219,7 +221,7 @@ class Ising(object):
          
         while self.i < iterations:
             time.sleep(sleep)
-            site = self.choose_site() 
+            site = self.choose_site() #TODO: get random sites in chunks rather
             delta_e = self.delta_energy(site) 
             probability = self.ptable[delta_e]
             flipped = self.flip(probability, site) 
@@ -250,7 +252,7 @@ class Ising(object):
             time.sleep(sleep)
             self.total_energy = self.calc_energy()
 
-            cluster = list()
+            cluster = list() #TODO: try out data structures than list
             perimeter = list()
 
             seed = self.choose_site()
