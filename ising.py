@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import time
 import numpy as np
+from itertools import permutations
+from pprint import pprint
+np.set_printoptions(threshold=np.nan, linewidth= 300)
 
 def prod( iterable ):
     p = 1
@@ -9,26 +12,32 @@ def prod( iterable ):
     return p
 
 class Ising(object):
-    def __init__(self, shape, temperature=10, aligned=False, mode='metropolis',
-                 handler=None, h5path=None, saveinterval=1):
+    def __init__(self, shape, sweeps, temperature=10, aligned=False, 
+                 mode='metropolis', handler=None, h5path=None, 
+                 saveinterval=1):
         """ 
         Parameters
         ----------
         shape : lattice shape 
+        sweeps : total number of sweeps to perform
         temperature: temperature 
         aligned: create grid with all spins in the same direction
         mode : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
-        saveinterval: iteration interval at which data is saved to hdf5
+        saveinterval: interval (in sweeps) at which data is saved to hdf5
     
         """
+        self.mode = mode
         self.shape = tuple(shape)
         self.dimension = len(shape)
         self.temperature = temperature
         self.handler = handler 
+
         self.h5path = h5path 
+        self.sweeps = sweeps
         self.saveinterval = saveinterval
+
         self.ptable = self.make_probability_table()
 
         self.lattice_size = prod(self.shape)
@@ -40,41 +49,33 @@ class Ising(object):
         else:
             raise ValueError("Unknown mode")
 
-
-        if self.dimension == 2:
-            self.neighbors = self.neighbors_2D
-            self.choose_site = self.choose_site_2D
-            self.delta_energy = self.delta_energy_2D
-            self.calc_energy = self.calc_energy_2D
-        elif self.dimension == 3:
-            self.neighbors = self.neighbors_3D
-            self.choose_site = self.choose_site_3D
-            self.delta_energy = self.delta_energy_3D
-            self.calc_energy = self.calc_energy_3D
-        else:
-            raise ValueError("Unsupported dimension")
-
-
         if aligned:
-            self.grid = np.ones(self.shape, dtype='int8')
+            self.grid = np.ones(self.lattice_size, dtype=bool)
         else:
-            grid = np.random.choice([-1, 1], size=self.shape)
-            self.grid = np.array(grid, dtype='int8')
+            grid = np.random.randint(2, size=self.lattice_size)
+            self.grid = np.array(grid, dtype=bool)
+
+        self.neighbor_table = self.make_neighbor_table()
+        self.dE_map = self.make_dE_map()
+        self.energy_map = self.make_energy_map()
         
-        self.total_energy = self.calc_energy()
-        
+        # save simulation parameters here 
         if (self.handler and self.h5path):
             self.writehdf5 = True
+            self.handler.append(np.array(self.shape), self.h5path+'shape')
             self.handler.append(self.temperature, self.h5path+'temperature')
             self.handler.append(self.lattice_size, self.h5path+'lattice_size')
+            self.handler.append(self.saveinterval, self.h5path+'saveinterval')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
         else:
             self.writehdf5 = False
 
+    #boolean array version
     @property
     def magnetization(self):
-        return self.grid.sum()
+        M = 2*self.grid.sum() - len(self.grid)
+        return M
 
     def make_probability_table(self):
         if self.dimension == 2:
@@ -88,156 +89,213 @@ class Ising(object):
         for dE in delta_energies:
             ptable.update({dE:np.exp(-dE/self.temperature)}) 
         return ptable
+   
+    def make_neighbor_table(self):
+        """
+        Returns a dictionary where the keys are the sites and the values
+        are the neighbors. So for a 4x4 lattice we have:
 
-    def choose_site_2D(self):
-        site_x = np.random.randint(0, self.shape[0])
-        site_y = np.random.randint(0, self.shape[1])
-        return site_x, site_y
+            {0: (1, 15, 4, 12),
+             1: (2, 0, 5, 13),
+             2: (3, 1, 6, 14),
+             3: (4, 2, 7, 15),
+             4: (5, 3, 8, 0),
+             5: (6, 4, 9, 1),
+             6: (7, 5, 10, 2),
+             7: (8, 6, 11, 3),
+             8: (9, 7, 12, 4),
+             9: (10, 8, 13, 5),
+             10: (11, 9, 14, 6),
+             11: (12, 10, 15, 7),
+             12: (13, 11, 0, 8),
+             13: (14, 12, 1, 9),
+             14: (15, 13, 2, 10),
+             15: (0, 14, 3, 11)}
 
-    def choose_site_3D(self):
-        site_x = np.random.randint(0, self.shape[0])
-        site_y = np.random.randint(0, self.shape[1])
-        site_z = np.random.randint(0, self.shape[2])
-        return site_x, site_y, site_z
+        """
+        nbr_table_helical = dict()                              
+        for site in range(self.lattice_size):
+            nbr_table_helical.update({site:self.nn_helical_bc_2D(site)})
+        return nbr_table_helical
 
-    def neighbors_2D(self, site):
-        i, j = site
-        ROW = self.shape[0]
-        COL = self.shape[1]
+    def make_energy_map(self):
+        '''
+        for site in range(self.lattice_size):
+            below, above, right, left = self.neighbor_table[site]
+            key = (bool(g[site]), (bool(g[right]), bool(g[below])) ) 
+            #dE = self.energy_map[key] 
+            #energy = energy + g[site]*( g[right] + g[below] )
+            energy = energy + self.energy_map[key]
 
-        left = (j + COL - 1) % COL
-        right = (j + 1) % COL
-        above = (i + ROW - 1) % ROW
-        below = (i + 1) % ROW
 
-        nbrs = (below, j), (above, j), (i, right), (i, left)
-        return nbrs
+        return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
+        '''
+        energy_map = dict()
 
-    def neighbors_3D(self, site):
-        i, j, k = site
+        #possible below and right neighbors
+        config1 = (True, True)   
+        config2 = (True, False)  
+        config3 = (False, False) 
 
-        ROW = self.shape[0]
-        COL = self.shape[1]
-        DEP = self.shape[2]
+        for perm in set(permutations(config1)):
+            energy_map.update({(True,perm):2})
+            energy_map.update({(False,perm):-2})
 
-        left = (j + COL - 1) % COL 
-        right = (j + 1) % COL 
-        above = (i + ROW - 1) % ROW
-        below = (i + 1) % ROW
+        for perm in set(permutations(config2)):
+            energy_map.update({(True,perm):0})
+            energy_map.update({(False,perm):0})
 
-        front = (k + DEP - 1) % DEP
-        back = (i + 1) % DEP
+        for perm in set(permutations(config3)):
+            energy_map.update({(True,perm):-2})
+            energy_map.update({(False,perm):2})
+   
+        return energy_map
 
-        nbrs = (below, j, k), (above, j, k), (i, right, k), (i, left, k), (i, j, back), (i, j, front)
-        return nbrs
+    def make_dE_map(self):
+        
+        dE_map = dict()
 
-    def calc_energy_2D(self): 
+        #possible neighbors
+        config1 = (True,True,True,True)     #if site = True => dE=8 else dE=-8
+        config2 = (True,True,True,False)    #if site = True => dE=4 else dE=-4
+        config3 = (True,True,False,False)   #dE = 0 
+        config4 = (True,False,False,False)  #if site = True => dE=-4 else dE=4
+        config5 = (False,False,False,False) #if site = True => dE=-8 else dE=8
+
+        #CHECK THESE!
+        for perm in set(permutations(config1)):
+            dE_map.update({(True,perm):8})
+            dE_map.update({(False,perm):-8})
+
+        for perm in set(permutations(config2)):
+            dE_map.update({(True,perm):4})
+            dE_map.update({(False,perm):-4})
+
+        for perm in set(permutations(config3)):
+            dE_map.update({(True,perm) :0})
+            dE_map.update({(False,perm) :0})
+
+        for perm in set(permutations(config4)):
+            dE_map.update({(True,perm):-4})
+            dE_map.update({(False,perm):4})
+
+        for perm in set(permutations(config5)):
+            dE_map.update({(True,perm):-8})
+            dE_map.update({(False,perm):8})
+   
+        return dE_map
+
+    def nn_helical_bc_2D(self, site):                                                               
+        """                                                                                   
+        site: int                                                                             
+        L: int                                                                                
+                                                                                              
+        Here i,j,k,l are the nearest neighbor indices for an ndarray of                       
+        shape (1,) with helical boundary conditions.                                          
+                                                                                              
+                                                                                              
+        So for example, here the neighbors of site=9 are shown:                               
+                                                                                              
+                                                                                              
+                                  above                                                       
+                              ------------|                                                   
+                             \|/          |                                                   
+        ----------------------------- L ----- R -----------------------------                 
+        | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |                 
+        ---------------------------------------------------------------------                 
+                                          |          /|\                                      
+                                          |------------                                       
+                                             below                                            
+                                                                                              
+                                                                                              
+         Which you can think of as a 2D lattice that looks like this:                         
+                                                                                              
+                                                                                              
+                                            -------------                                     
+          1   2   3   4   5   6   7   8   9 | 1 | 2 | 3 |                                     
+                                 ------------------------                                     
+          4   5   6   7   8   9 | 1 | 2 | 3 | 4 | 5 | 6 |                                     
+                     -------------------------------------                                    
+          7   8   9 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |                                     
+        ------------|------------------------------------                                     
+        | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 1 | 2 | 3 |                                     
+        ------------|------------------------------------                                     
+        | 4 | 5 | 6 | 7 | 8 | 9 | 1 | 2 | 3 | 4 | 5 | 6 |                                     
+        ------------|------------------------------------                                     
+        | 7 | 8 | 9 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |                                     
+        ------------|------------------------------------                                     
+        | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 1   2   3                                       
+        ------------|------------------------                                                 
+        | 4 | 5 | 6 | 7 | 8 | 9 | 1   2   3   4   5   6                                       
+        ------------|------------                                                             
+        | 7 | 8 | 9 | 1   2   3   4   5   6   7   8   9                                       
+        -------------                                                                         
+                                                                                              
+                                                                                              
+        """ 
+        L = self.shape[0] 
+        
+        i = (site+1) % L**2                                                                      
+        j = (site-1) % L**2                                                                      
+        k = (site+L) % L**2                                                                      
+        l = (site-L) % L**2                                                                      
+        return i,j,k,l    
+
+    def calc_energy(self): 
         """
         Function that iterates through the ising array and calculates product 
-        of its value with right and lower neighbor. Boundary conditions link 
-        last entry in row with first in row and last entry in column with 
-        first in column (torus).
-
+        of its value with right and lower neighbor. 
         """
         g = self.grid
         energy = 0
 
-        for site, value in np.ndenumerate(g):
-            below, above, right, left = self.neighbors(site)
-            #TODO: rather than performing this arithmetic, 
-            # get energy from table
-            energy = energy + g[site]*( g[right] + g[below] )
-
+        for site in range(self.lattice_size):
+            below, above, right, left = self.neighbor_table[site]
+            key = (bool(g[site]), (bool(g[right]), bool(g[below])) ) 
+            energy = energy + self.energy_map[key]
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
-    def calc_energy_3D(self):
-        """
-        Function that iterates through the ising array and calculates product 
-        of its value with right and lower neighbor. Boundary conditions link 
-        last entry in row with first in row and last entry in column with 
-        first in column (torus).
-
-        """
+    def delta_energy(self, site):
+        """  Returns dE = E2 - E1  (right??)     """
         g = self.grid
-        energy = 0 
-        for site, value in np.ndenumerate(g):
-            below, above, right, left, back, front = self.neighbors(site)
-            energy = energy + g[site]*( g[right] + g[below] + g[front])
-
-        return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
-
-
-    def delta_energy_2D(self, site):
-        """
-        Berekent verandering in energie als gevolg van het omdraaien van het 
-        teken (spin flip) op de positie "site".
-
-        """
-        g = self.grid
-        below, above, right, left = self.neighbors(site)
-        d_energy = np.int8(-2)*(-g[site] * (g[below] + g[above] +g[right] +g[left]))
-        return int(d_energy)
-
-
-    def delta_energy_3D(self, site):
-        """
-        Berekent verandering in energie als gevolg van het omdraaien van het 
-        teken (spin flip) op de positie "site".
-        """
-        g = self.grid
-        below, above, right, left, back, front = self.neighbors(site)
-        d_energy = np.int8(-2)*(-g[site] * (g[below] + g[above] + g[right] + g[left] + g[back] + g[front]))
-        return int(d_energy)
-
-    
-    def flip(self, prob, site):
-        """ 
-        Flip 'site' with probability 'prob'.
-
-        Parameters
-        ----------
-        prob: probability 
-        site: tuple (e.g. (i,j) if 2D, (i,j,k) if 3D)
-        """
-        determinant = np.random.ranf() #random flt from uniform distr (0,1).
-
-        if prob >= 1:
-            self.grid[site] = -self.grid[site]
-            return True
-
-        else:
-            if determinant <= prob:                     
-                self.grid[site] = -self.grid[site]
-                return True
-            else:
-                return False
+        below, above, right, left = self.neighbor_table[site]
+        key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]), bool(g[left])) ) 
+        dE = self.dE_map[key] 
+        return dE 
 
         
-    def evolve_metropolis(self, iterations, sleep=0):
+    def evolve_metropolis(self, pbar, sleep=0):
         """
         Evolve it using Metropolis.
         """
-        self.i = 0
+
+        def sweep():
+            for i in range(self.lattice_size):
+                #if i % 1000 ==0:
+                #    tempgrid = np.array(self.grid.reshape(self.shape[0], self.shape[1]),dtype='int8')
+                #    print(tempgrid)
+                site = np.random.randint(0, self.lattice_size) #get this in chunks
+                dE = self.delta_energy(site) 
+                if dE <= 0: 
+                    self.grid[site] = -self.grid[site]
+                elif np.random.ranf() <= self.ptable[dE]:
+                    self.grid[site] = -self.grid[site]
          
-        while self.i < iterations:
-            time.sleep(sleep)
-            site = self.choose_site() #TODO: get random sites in chunks rather
-            delta_e = self.delta_energy(site) 
-            probability = self.ptable[delta_e]
-            flipped = self.flip(probability, site) 
+
+        for s in range(self.sweeps):
+            pbar.update(s)
+            sweep()
             
-            if flipped and delta_e != 0:
-                self.total_energy = self.total_energy + delta_e
-
-            if self.writehdf5 and self.i % self.saveinterval == 0:
-                self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
-                self.handler.append(self.total_energy, self.h5path+'energy')
-                self.handler.append(self.magnetization, self.h5path+'magnetization')
-
-            self.i += 1
+            if s % self.saveinterval == 0:
+                if self.writehdf5:
+                    self.handler.append(s, self.h5path+'sweep', dtype='int64')
+                    #recalculating total energy at intervals likely faster than continously updating total energy?
+                    self.handler.append(self.calc_energy(), self.h5path+'energy')
+                    self.handler.append(self.magnetization, self.h5path+'magnetization')
 
 
-    def evolve_wolff(self, iterations, sleep=0):
+
+    def evolve_wolff(self, pbar, sleep=0):
         """
         Ewolve it using Wolff's algorithm.
         """
@@ -248,18 +306,17 @@ class Ising(object):
         bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
 
         self.i=0
-        while self.i < iterations:
-            time.sleep(sleep)
-            self.total_energy = self.calc_energy()
 
-            cluster = list() #TODO: try out data structures than list
+        while self.i < self.sweeps:
+            cluster = list() 
             perimeter = list()
 
-            seed = self.choose_site()
+            seed = np.random.randint(0, self.lattice_size)
             seed_spin = g[seed]
             cluster.append(seed)
 
-            nbrs = self.neighbors(seed)
+            #nbrs = self.neighbors(seed)
+            nbrs = self.neighbor_table[seed]
 
             for nbr in nbrs:
                 if seed_spin == g[nbr]:
@@ -276,19 +333,52 @@ class Ising(object):
                     if determinant <= bond_probability: 
                         cluster.append(site_to_test)
 
-                        nbrs = self.neighbors(site_to_test)
+                        #nbrs = self.neighbors(site_to_test)
+                        nbrs = self.neighbor_table[site_to_test]
                         for nbr in nbrs:
                             if nbr not in cluster and nbr not in perimeter:
                                 perimeter.append(nbr)
 
             #flip cluster
-            g[np.array(cluster)[:,0], np.array(cluster)[:,1]] = -seed_spin
+            g[np.array(cluster)] = -seed_spin
 
             if self.writehdf5 and self.i % self.saveinterval == 0:
                 self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
-                self.handler.append(self.total_energy, self.h5path+'energy')
+                self.handler.append(self.calc_energy(), self.h5path+'energy')
                 self.handler.append(self.magnetization, self.h5path+'magnetization')
 
             self.i += 1
+
+    def print_sim_parameters(self):
+        sweeps = self.sweeps
+        Lx = self.shape[0] 
+        Ly = self.shape[1]
+        N = Lx*Ly
+        saveinterval_in_iterations = N*self.saveinterval
+
+        total_iters = sweeps * Lx * Ly 
+
+        try:
+            Lz = self.shape[2]
+            N = Lx*Ly*Lz
+            total_iters = sweeps * Lx * Ly * Lz
+        except (IndexError, NameError):
+            pass
+
+        s = """
+        h5path             : {}   
+        Algorithm          : {}  
+        Lattice Shape      : {}  
+        Lattice Size       : {}
+        Temperature        : {}   
+        Sweeps to perform  : {} (1 sweep = {} iterations)
+        Total Iterations   : {} ({} * {} * {}) 
+        Saving state every : {} sweeps (every {} iterations)
+        """.format(self.h5path, self.mode, self.shape, N, self.temperature,
+                   sweeps, N ,total_iters, sweeps, Lx, Ly, self.saveinterval, saveinterval_in_iterations)
+        print(s)
+        pass
+        #TODO
+        #3D version
 
 
