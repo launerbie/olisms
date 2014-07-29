@@ -1,156 +1,131 @@
 #!/usr/bin/env python
 
+import os
 import h5py
 import numpy as np
+import numpy 
 import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib import colors
 import argparse
+import progressbar as pb
 
 def main():
- 
-    f = h5py.File(args.filename)
-    
-#    autocorrelation_energy(f, args.n) 
-    autocorrelation_magnetization(f, args.n) 
-    
+    """
+    Create 'figures' directory if it doesn't exist. Make plots and save plots 
+    to this directory.
+    """
+    from colors import rundark
+    rundark()
 
-def variance(input_array):
+    directory = 'figures'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
-    arr_squared = input_array**2
-    
-    var = arr_squared.mean() - (input_array.mean())**2
+    f = h5py.File(args.filename) 
+    basename = os.path.basename(args.filename)
+    name = os.path.splitext(basename)[0]
 
-    return var
+    make_combined_plots(f,directory,name)
 
+def acf(x, length):
+    """
+    x: 1d array
+    length: maximum dt for which to calculate correlation
 
-def print_progress(counter, total, stepsize):
-    
-    if (counter)%(total/stepsize) == 0:
-        print('PROGRESS: ', counter/(total/100), '%')
+    See https://en.wikipedia.org/wiki/Pearson_product-moment_correlation_coefficient
+    for the definition of the correlation matrix.
+    """
+    coeffs = [np.corrcoef(x[:-dt], x[dt:])[0,1] for dt in range(1,length)]
+    return numpy.array([1]+ coeffs)
 
-def autocorrelation_energy(f, number_of_spins):
+def make_combined_plots(f, directory, name):
     sims = f.values()
 
-    simulation_number = 1
-    for s in sims:
-        
-        print("\n", 'COMPUTING AUTOCORRELATION: SIMULATION', simulation_number,)
-        simulation_number = simulation_number + 1
+    #cmap = cm.RdBu_r 
+    cmap = cm.hot 
 
-        figname = str(s.name)
+    firstsim = list(f.values())[0]
+    shape = firstsim['shape'][0]
+    algorithm = f.attrs['mode']
 
-        if (number_of_spins == None):
-            N = s['lattice_size'][0]
-        else:
-            N = number_of_spins #Included so that we can plot "old" data sets as well
-      
-        MSC0 = int(10*N)
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    
+    pbar = pb.ProgressBar(widgets=drawwidget("Generating ACF Magnetization: "),
+                  maxval=len(sims)).start()
+    
+    for simnr, sim in enumerate(sims):
+        pbar.update(simnr)
 
-        energy = s['energy'][-MSC0:]
-        
-        '''
-        Hier implementeren: c_e(Dt) = <(E(t+Dt)-<E>)*(E(t)-<E>)>_t
-        '''
+        T = sim['temperature'][0]
+        #temperature based linecolor
+        norm = colors.Normalize(vmin=1.4,vmax=3.6)
+        linecolor = cmap(norm(T))
 
-        size_energy = len(s['energy'][-MSC0:])
-        
-        avg_energy = s['energy'][-MSC0:].mean()
- 
-        delta_t = np.arange(size_energy)
-        correlation = [] 
-        
-        var = variance(energy)
+        magnetization = sim['magnetization']
 
-        for k in delta_t:
-            summ = 0
-            i = 0
+        ax1.plot(acf(magnetization, 500), c=linecolor)
 
-            print_progress(k, size_energy, 10)
+    ax1.set_xlabel('dt [in sweeps]')
+    ax1.set_ylabel('C (dt)')
+    ax1.set_xlim(0,100)
+    ax1.set_ylim(-0.1,1)
+    ax1.set_title("{} {}".format(shape, algorithm))
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm._A = []
+    cbbar_handle = plt.colorbar(sm)
+    cbbar_handle.set_label('Temperature')
+    plt.savefig(directory+"/"+str(name)+"_mag_autocorr.png",
+            bbox_inches='tight')
 
-            while i+k < size_energy:
-                summ = summ + (energy[i + k] - avg_energy)*(energy[i] - avg_energy)
-                i = i + 1
-            
-            c_van_delta_t = summ/var 
-            correlation.append(c_van_delta_t)
+    pbar.finish()
 
-        corr_array = np.array(correlation)
-        
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(delta_t, corr_array)
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    pbar = pb.ProgressBar(widgets=drawwidget("Generating ACF Energy: "),
+                  maxval=len(sims)).start()
+    
+    for simnr, sim in enumerate(sims):
+        pbar.update(simnr)
 
-        ax.set_xlabel('delta_t')
-        ax.set_ylabel('c_e')
- 
-        plt.savefig('plots2'+figname+"energy_autocorrelation"+".png")   
+        T = sim['temperature'][0]
+        norm = colors.Normalize(vmin=1.4,vmax=3.6)
+        linecolor = cmap(norm(T))
 
-def autocorrelation_magnetization(f, number_of_spins):
-    sims = f.values()
+        energy = sim['energy']
+        ax1.plot(acf(energy, 500), c=linecolor)
 
-    simulation_number = 1
-    for s in sims:
-        
-        print("\n", 'SIMULATION', simulation_number,)
-        simulation_number = simulation_number + 1
+    ax1.set_xlabel('dt [in sweeps]')
+    ax1.set_ylabel('C (dt)')
+    ax1.set_xlim(0,100)
+    ax1.set_ylim(-0.1,1)
+    ax1.set_title("{} {}".format(shape, algorithm))
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm._A = []
+    cbbar_handle = plt.colorbar(sm)
+    cbbar_handle.set_label('Temperature')
+    plt.savefig(directory+"/"+str(name)+"_energy_autocorr.png",
+            bbox_inches='tight')
 
-        figname = str(s.name)
+    pbar.finish()
 
-        if (number_of_spins == None):
-            N = s['lattice_size'][0]
-        else:
-            N = number_of_spins #Included so that we can plot "old" data sets as well
-       
-        MSC0 = int(10*N)
 
-        magnetization = s['magnetization'][-MSC0:]
-        
-        '''
-        Hier implementeren: c_m(Dt) = <(M(t+Dt)-<M>)*(M(t)-<M>)>_t
-        '''
+def drawwidget(discription):
+    """ Formats the progressbar. """
+    widgets = [discription.ljust(20), pb.Percentage(), ' ',
+               pb.Bar(marker='#',left='[',right=']'),
+               ' ', pb.ETA()]
+    return widgets
 
-        size_magnetization = len(s['magnetization'][-MSC0:])
-        
-        avg_magnetization = s['magnetization'][-MSC0:].mean()
- 
-        delta_t = np.arange(size_magnetization)
-        correlation = [] 
-        
-        var = variance(magnetization)
-
-        for k in delta_t:
-            summ = 0
-            i = 0
-
-            print_progress(k, size_magnetization, 10)
-
-            while i+k < size_magnetization:
-                summ = summ + (magnetization[i + k] - avg_magnetization)*(magnetization[i] - avg_magnetization)
-                i = i + 1
-            
-            c_van_delta_t = summ/var 
-            correlation.append(c_van_delta_t)
-
-        corr_array = np.array(correlation)
-        
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(delta_t, corr_array)
-
-        ax.set_xlabel('delta_t')
-        ax.set_ylabel('c_m')
- 
-        plt.savefig('plots3'+figname+"magnetization_autocorrelation"+".png")   
-
+    
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('filename', metavar="HDF5 FILENAME")
-    parser.add_argument('-n', default = None, type = int,
-                       help="Number of spins. Specify only if hdf5 file does not include this info.")
-
     args = parser.parse_args()
     return args
+
 
 if __name__ == "__main__":
     args = get_arguments()

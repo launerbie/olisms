@@ -89,12 +89,11 @@ def main():
                                     # see http://h5py.readthedocs.org/en/latest/strings.html for more info
 
 
-        
-        if algorithm == 'wolff':
-            MCS0 = 500 #cut-off point
+        if algorithm == 'wolff': #FALSE for python3!
+            MCS0 = 4000 #cut-off point
             time = firstsim['clusterflip'][-MCS0:]
         else:
-            MCS0 = int(2*saveinterval) #cut-off point
+            MCS0 = 5000 #cut-off point
             time = firstsim['sweep'][-MCS0:]
 
 
