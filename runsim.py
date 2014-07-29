@@ -51,11 +51,12 @@ def simulate():
 
             i = Ising(args.shape, args.sweeps, temperature=T, handler=handler, 
                       h5path=h5path, aligned=args.aligned, mode=args.algorithm,
-                      saveinterval=args.saveinterval)
+                      saveinterval=args.saveinterval, skip_n_steps=args.skip)
 
-            i.print_sim_parameters()
+            if args.verbose:
+                i.print_sim_parameters()
 
-            pbar = pb.ProgressBar(widgets=drawwidget("   Simulation {}/{} ".format(index+1, len(temperatures))),
+            pbar = pb.ProgressBar(widgets=drawwidget("  T = {}  {}/{} ".format(round(T,4), index+1, len(temperatures))),
                               maxval=args.sweeps).start()
 
 
@@ -91,7 +92,9 @@ def get_arguments():
     parser.add_argument('--tmax', default=3.5, type=float)
     parser.add_argument('--steps', default=10, type=float)
     parser.add_argument('--saveinterval', default=50, type=int)
+    parser.add_argument('--skip', default=0, type=int)
     parser.add_argument('--test', action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args()
     return args

@@ -44,6 +44,11 @@ voor een plaatje met deze colormaps.
 
 """
 
+#NOTE: broken for python 3!
+#TODO remove MCS0 variable which is used as cut-off point
+# do this once you have datasets for which all data was measured
+# in the thermalized part of the simulation
+
 def main():
     directory = 'figures'
     if not os.path.exists(directory):
@@ -61,7 +66,7 @@ def main():
         ax3 = fig.add_subplot(gs[1,:])
         ax4 = fig.add_subplot(gs[2,:])
 
-        cmap = cm.RdBu #red blue
+        cmap = cm.RdBu_r 
         
         temperatures = []
         avg_net_mags = []
@@ -71,27 +76,44 @@ def main():
 
         shape = firstsim['shape'][0]
         saveinterval = firstsim['saveinterval'][0]
-        algorithm = 'unknown' # get from hdf5...
         N = firstsim['lattice_size'][0]  
-        MCS0 = int(2*saveinterval) #cut-off point
+        saveinterval = firstsim['saveinterval'][0]
+        commit = str(f.attrs['commit'])
+        print("Created with commit:", commit)
+
+        algorithm = f.attrs['mode']
+
+        print('alg = {}'.format(algorithm), type(algorithm))
+        print(type('wolff'))
+        print(algorithm == 'wolff') # need this True in both python 2 and 3, for now only True in python2
+                                    # see http://h5py.readthedocs.org/en/latest/strings.html for more info
+
+
+        
+        if algorithm == 'wolff':
+            MCS0 = 500 #cut-off point
+            time = firstsim['clusterflip'][-MCS0:]
+        else:
+            MCS0 = int(2*saveinterval) #cut-off point
+            time = firstsim['sweep'][-MCS0:]
+
 
         for sim in f.values(): #Each sim corresponds to a simulation at some Temperature
             T = sim['temperature'][0]
             M = sim['magnetization'][-MCS0:]
             net_M = abs(M)
             E = sim['energy'][-MCS0:]
-            sweep = sim['sweep'][-MCS0:]
 
             temperatures.append(T)
             avg_net_mags.append(numpy.mean(net_M))
             chi.append(1/(T*N)*numpy.var(net_M))
 
             #temperature based linecolor
-            norm = colors.Normalize(vmin=1.8,vmax=3.2)
+            norm = colors.Normalize(vmin=2.0,vmax=3.0)
             linecolor = cmap(norm(T))
 
-            ax3.plot(sweep, E, color=linecolor)
-            ax4.plot(sweep, net_M, color=linecolor)
+            ax3.plot(time, E, color=linecolor)
+            ax4.plot(time, net_M, color=linecolor)
 
         ax1.plot(temperatures, numpy.array(avg_net_mags)/N, c='k', marker='o', ms=4)
         ax2.plot(numpy.array(temperatures), chi, c='k', marker='o', ms=4)
@@ -100,20 +122,25 @@ def main():
         ax1.set_ylabel('<|M|>')
         ax2.set_xlabel('T')
         ax2.set_ylabel('Chi')
-        ax3.set_xlabel('time [sweeps]')
+
+        if algorithm == 'wolff':
+            ax3.set_xlabel('time [clusterflips]')
+            ax4.set_xlabel('time [clusterflips]')
+        elif algorithm == 'metropolis':
+            ax3.set_xlabel('time [sweeps]')
+            ax4.set_xlabel('time [sweeps]')
+
         ax3.set_ylabel('E')
-        ax4.set_xlabel('time [sweeps]')
         ax4.set_ylabel('|M|')
 
 
 
-        maps = mpl.cm.ScalarMappable(norm=norm, cmap=cm.RdBu)
+        maps = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
         cax, kw = mpl.colorbar.make_axes([ax3,ax4])
         maps._A = [] #TODO: remove ugly hack
         plt.colorbar(maps, cax=cax)
 
-        fig.suptitle('{}   {} '.format(f.filename, shape) ,fontsize=12)
-        #TODO: include algorithm in title
+        fig.suptitle('{}\n {} {}  sampling interval {}'.format(f.filename, algorithm, shape, int(saveinterval) ) ,fontsize=12)
 
         if not args.plot:
             plt.savefig(directory+"/"+str(name)+"_summary"+".png", bbox_inches='tight')

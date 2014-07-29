@@ -3,6 +3,7 @@ import time
 import numpy as np
 from itertools import permutations
 from pprint import pprint
+import subprocess
 np.set_printoptions(threshold=np.nan, linewidth= 300)
 
 def prod( iterable ):
@@ -14,7 +15,7 @@ def prod( iterable ):
 class Ising(object):
     def __init__(self, shape, sweeps, temperature=10, aligned=False, 
                  mode='metropolis', handler=None, h5path=None, 
-                 saveinterval=1):
+                 saveinterval=1, skip_n_steps=0):
         """ 
         Parameters
         ----------
@@ -26,6 +27,9 @@ class Ising(object):
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
         saveinterval: interval (in sweeps) at which data is saved to hdf5
+        
+        TODO:
+        skip_n_steps: skip n steps before saving data 
     
         """
         self.mode = mode
@@ -37,6 +41,7 @@ class Ising(object):
         self.h5path = h5path 
         self.sweeps = sweeps
         self.saveinterval = saveinterval
+        self.skip_n_steps = skip_n_steps
 
         self.ptable = self.make_probability_table()
 
@@ -68,6 +73,17 @@ class Ising(object):
             self.handler.append(self.saveinterval, self.h5path+'saveinterval')
             self.handler.append(np.array(self.grid, dtype='int8'), 
                                 self.h5path+'initgrid', dtype='int8')
+
+            try:
+                commit = subprocess.check_output(["git", "rev-parse","HEAD"])
+            except:
+                commit = "Unknown"
+
+            #consider numpy.string_(commit)
+            self.handler.file.attrs['commit'] = commit
+            #consider numpy.string_(mode)
+            self.handler.file.attrs['mode'] = mode
+
         else:
             self.writehdf5 = False
 
@@ -83,7 +99,8 @@ class Ising(object):
         elif self.dimension == 3:
             delta_energies = [-12, -8, -4, 0, 4, 8, 12]  
         else:
-            raise ValueError("No probability table for lattice dimension {}".format(self.dimension))
+            s = "No probability table for lattice dimension "
+            raise ValueError(s+"{}".format(self.dimension))
 
         ptable = dict() 
         for dE in delta_energies:
@@ -156,11 +173,11 @@ class Ising(object):
         dE_map = dict()
 
         #possible neighbors
-        config1 = (True,True,True,True)     #if site = True => dE=8 else dE=-8
-        config2 = (True,True,True,False)    #if site = True => dE=4 else dE=-4
-        config3 = (True,True,False,False)   #dE = 0 
-        config4 = (True,False,False,False)  #if site = True => dE=-4 else dE=4
-        config5 = (False,False,False,False) #if site = True => dE=-8 else dE=8
+        config1 = (True,True,True,True)     
+        config2 = (True,True,True,False)    
+        config3 = (True,True,False,False)   
+        config4 = (True,False,False,False) 
+        config5 = (False,False,False,False)
 
         #CHECK THESE!
         for perm in set(permutations(config1)):
@@ -268,11 +285,11 @@ class Ising(object):
         """
         Evolve it using Metropolis.
         """
-
         def sweep():
             for i in range(self.lattice_size):
                 #if i % 1000 ==0:
-                #    tempgrid = np.array(self.grid.reshape(self.shape[0], self.shape[1]),dtype='int8')
+                #    tempgrid = np.array(self.grid.reshape(self.shape[0],
+                #                        self.shape[1]),dtype='int8')
                 #    print(tempgrid)
                 site = np.random.randint(0, self.lattice_size) #get this in chunks
                 dE = self.delta_energy(site) 
@@ -286,13 +303,15 @@ class Ising(object):
             pbar.update(s)
             sweep()
             
-            if s % self.saveinterval == 0:
+            if s % self.saveinterval == 0 and s >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.append(s, self.h5path+'sweep', dtype='int64')
-                    #recalculating total energy at intervals likely faster than continously updating total energy?
+                    self.handler.append(s, self.h5path+'sweep', dtype='int16')
+                    #recalculating total energy at intervals likely faster 
+                    #than continously updating total energy?
                     self.handler.append(self.calc_energy(), self.h5path+'energy')
                     self.handler.append(self.magnetization, self.h5path+'magnetization')
 
+        self.handler.append(self.grid, self.h5path+'finalstate')
 
 
     def evolve_wolff(self, pbar, sleep=0):
@@ -308,6 +327,8 @@ class Ising(object):
         self.i=0
 
         while self.i < self.sweeps:
+            pbar.update(self.i)
+
             cluster = list() 
             perimeter = list()
 
@@ -315,7 +336,6 @@ class Ising(object):
             seed_spin = g[seed]
             cluster.append(seed)
 
-            #nbrs = self.neighbors(seed)
             nbrs = self.neighbor_table[seed]
 
             for nbr in nbrs:
@@ -333,7 +353,6 @@ class Ising(object):
                     if determinant <= bond_probability: 
                         cluster.append(site_to_test)
 
-                        #nbrs = self.neighbors(site_to_test)
                         nbrs = self.neighbor_table[site_to_test]
                         for nbr in nbrs:
                             if nbr not in cluster and nbr not in perimeter:
@@ -342,14 +361,18 @@ class Ising(object):
             #flip cluster
             g[np.array(cluster)] = -seed_spin
 
-            if self.writehdf5 and self.i % self.saveinterval == 0:
-                self.handler.append(self.i, self.h5path+'iterations', dtype='int64')
-                self.handler.append(self.calc_energy(), self.h5path+'energy')
-                self.handler.append(self.magnetization, self.h5path+'magnetization')
+            if self.i % self.saveinterval == 0 and self.i >= self.skip_n_steps:
+                if self.writehdf5:
+                    self.handler.append(self.i, self.h5path+'clusterflip', dtype='int16')
+                    self.handler.append(self.calc_energy(), self.h5path+'energy')
+                    self.handler.append(self.magnetization, self.h5path+'magnetization')
 
             self.i += 1
 
+        self.handler.append(self.grid, self.h5path+'finalstate')
+
     def print_sim_parameters(self):
+
         sweeps = self.sweeps
         Lx = self.shape[0] 
         Ly = self.shape[1]
@@ -365,20 +388,32 @@ class Ising(object):
         except (IndexError, NameError):
             pass
 
-        s = """
-        h5path             : {}   
-        Algorithm          : {}  
-        Lattice Shape      : {}  
-        Lattice Size       : {}
-        Temperature        : {}   
-        Sweeps to perform  : {} (1 sweep = {} iterations)
-        Total Iterations   : {} ({} * {} * {}) 
-        Saving state every : {} sweeps (every {} iterations)
-        """.format(self.h5path, self.mode, self.shape, N, self.temperature,
-                   sweeps, N ,total_iters, sweeps, Lx, Ly, self.saveinterval, saveinterval_in_iterations)
+        if self.mode == 'metropolis':
+            s = """
+            h5path             : {}   
+            Algorithm          : {}  
+            Lattice Shape      : {}  
+            Lattice Size       : {}
+            Temperature        : {}   
+            Sweeps to perform  : {} (1 sweep = {} iterations)
+            Total Iterations   : {} ({} * {} * {}) 
+            Saving state every : {} sweeps (every {} iterations)
+            """.format(self.h5path, self.mode, self.shape, N, self.temperature,
+                       sweeps, N ,total_iters, sweeps, Lx, Ly, 
+                       self.saveinterval, saveinterval_in_iterations)
+
+        elif self.mode == 'wolff':
+            s = """
+            h5path             : {}   
+            Algorithm          : {}  
+            Lattice Shape      : {}  
+            Lattice Size       : {}
+            Temperature        : {}   
+            Cluster flips      : {} 
+            Saving state every : {} cluster flips
+            """.format(self.h5path, self.mode, self.shape, N, self.temperature,
+                       sweeps, self.saveinterval)
         print(s)
-        pass
         #TODO
         #3D version
-
 
