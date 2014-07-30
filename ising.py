@@ -136,17 +136,17 @@ class Ising(object):
         return nbr_table_helical
 
     def make_energy_map(self):
-        '''
-        for site in range(self.lattice_size):
-            below, above, right, left = self.neighbor_table[site]
-            key = (bool(g[site]), (bool(g[right]), bool(g[below])) ) 
-            #dE = self.energy_map[key] 
-            #energy = energy + g[site]*( g[right] + g[below] )
-            energy = energy + self.energy_map[key]
-
-
-        return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
-        '''
+        """
+        This functions returns this dictionary:
+        {(False, (False, False)): 2,
+         (False, (False, True)): 0,
+         (False, (True, False)): 0,
+         (False, (True, True)): -2,
+         (True, (False, False)): -2,
+         (True, (False, True)): 0,
+         (True, (True, False)): 0,
+         (True, (True, True)): 2}
+        """
         energy_map = dict()
 
         #possible below and right neighbors
@@ -169,6 +169,40 @@ class Ising(object):
         return energy_map
 
     def make_dE_map(self):
+        """
+        {(False, (False, False, False, False)): 8,
+         (False, (False, False, False, True)): 4,
+         (False, (False, False, True, False)): 4,
+         (False, (False, False, True, True)): 0,
+         (False, (False, True, False, False)): 4,
+         (False, (False, True, False, True)): 0,
+         (False, (False, True, True, False)): 0,
+         (False, (False, True, True, True)): -4,
+         (False, (True, False, False, False)): 4,
+         (False, (True, False, False, True)): 0,
+         (False, (True, False, True, False)): 0,
+         (False, (True, False, True, True)): -4,
+         (False, (True, True, False, False)): 0,
+         (False, (True, True, False, True)): -4,
+         (False, (True, True, True, False)): -4,
+         (False, (True, True, True, True)): -8,
+         (True, (False, False, False, False)): -8,
+         (True, (False, False, False, True)): -4,
+         (True, (False, False, True, False)): -4,
+         (True, (False, False, True, True)): 0,
+         (True, (False, True, False, False)): -4,
+         (True, (False, True, False, True)): 0,
+         (True, (False, True, True, False)): 0,
+         (True, (False, True, True, True)): 4,
+         (True, (True, False, False, False)): -4,
+         (True, (True, False, False, True)): 0,
+         (True, (True, False, True, False)): 0,
+         (True, (True, False, True, True)): 4,
+         (True, (True, True, False, False)): 0,
+         (True, (True, True, False, True)): 4,
+         (True, (True, True, True, False)): 4,
+         (True, (True, True, True, True)): 8}
+        """
         
         dE_map = dict()
 
@@ -281,16 +315,12 @@ class Ising(object):
         return dE 
 
         
-    def evolve_metropolis(self, pbar, sleep=0):
+    def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
         """
         Evolve it using Metropolis.
         """
         def sweep():
             for i in range(self.lattice_size):
-                #if i % 1000 ==0:
-                #    tempgrid = np.array(self.grid.reshape(self.shape[0],
-                #                        self.shape[1]),dtype='int8')
-                #    print(tempgrid)
                 site = np.random.randint(0, self.lattice_size) #get this in chunks
                 dE = self.delta_energy(site) 
                 if dE <= 0: 
@@ -306,15 +336,13 @@ class Ising(object):
             if s % self.saveinterval == 0 and s >= self.skip_n_steps:
                 if self.writehdf5:
                     self.handler.append(s, self.h5path+'sweep', dtype='int16')
-                    #recalculating total energy at intervals likely faster 
-                    #than continously updating total energy?
                     self.handler.append(self.calc_energy(), self.h5path+'energy')
                     self.handler.append(self.magnetization, self.h5path+'magnetization')
 
         self.handler.append(self.grid, self.h5path+'finalstate')
 
 
-    def evolve_wolff(self, pbar, sleep=0):
+    def evolve_wolff(self, pbar):
         """
         Ewolve it using Wolff's algorithm.
         """
@@ -416,4 +444,72 @@ class Ising(object):
         print(s)
         #TODO
         #3D version
+
+class IsingAnim(Ising):
+    def evolve_metropolis(self, sleep=0):
+        self.sweepcount = 0
+        def sweep():
+            for i in range(self.lattice_size):
+                site = np.random.randint(0, self.lattice_size) #get this in chunks
+                dE = self.delta_energy(site) 
+                if dE <= 0: 
+                    self.grid[site] = -self.grid[site]
+                elif np.random.ranf() < self.ptable[dE]:
+                    self.grid[site] = -self.grid[site]
+         
+
+        for s in range(self.sweeps):
+            time.sleep(sleep)
+            sweep()
+            self.sweepcount += 1 
+            
+
+    def evolve_wolff(self, sleep=0):
+        g = self.grid
+
+        J = 1
+        kB = 1
+        bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
+
+        self.sweepcount=0
+
+        while self.sweepcount < self.sweeps:
+            time.sleep(sleep)
+
+            cluster = list() 
+            perimeter = list()
+
+            seed = np.random.randint(0, self.lattice_size)
+            seed_spin = g[seed]
+            cluster.append(seed)
+
+            nbrs = self.neighbor_table[seed]
+
+            for nbr in nbrs:
+                if seed_spin == g[nbr]:
+                    perimeter.append(nbr)
+
+            while len(perimeter) != 0:
+
+                site_to_test = perimeter[0]
+                perimeter.pop(0)
+
+                if seed_spin == g[site_to_test]:
+                    determinant = np.random.ranf()
+
+                    if determinant <= bond_probability: 
+                        cluster.append(site_to_test)
+
+                        nbrs = self.neighbor_table[site_to_test]
+                        for nbr in nbrs:
+                            if nbr not in cluster and nbr not in perimeter:
+                                perimeter.append(nbr)
+
+            #flip cluster
+            g[np.array(cluster)] = -seed_spin
+
+
+            self.sweepcount += 1
+
+
 
