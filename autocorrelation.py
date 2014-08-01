@@ -62,6 +62,7 @@ def make_acf_plot(h5pyfile, name, **kwargs):
 
     cmap = kwargs.get('cmap', cm.hot)
     length = kwargs.get('length', 500)
+    dpi = kwargs.get('dpi', 80)
     xlim = kwargs.get('xlim', None)
     img_suffix = kwargs.get('img_suffix', '_{}_acf'.format(h5path))
     targetdir = kwargs.get('targetdir', 'figures')
@@ -113,7 +114,7 @@ def make_acf_plot(h5pyfile, name, **kwargs):
     cbbar_handle.set_label('Temperature')
 
     plt.savefig(targetdir + "/" + name + img_suffix + ".png",
-                bbox_inches='tight')
+                bbox_inches='tight', dpi=dpi)
 
     pbar.finish()
 
@@ -125,6 +126,7 @@ def get_arguments():
     parser.add_argument('--norm', nargs=2, metavar="vmin vmax", type=float)
     parser.add_argument('--length', default=500, type=int)
     parser.add_argument('--runbright', action="store_true")
+    parser.add_argument('--dpi', default=80, type=int)
     arguments = parser.parse_args()
     return arguments
 
@@ -145,9 +147,9 @@ def main():
         # get_basename('path_to/myfile.hdf5') = 'myfile'
 
         make_acf_plot(h5pyfile, name, h5path='magnetization', norm=ARGS.norm,
-                      length=ARGS.length, xlim=ARGS.xlim)
+                      length=ARGS.length, xlim=ARGS.xlim, dpi=ARGS.dpi)
         make_acf_plot(h5pyfile, name, h5path='energy', norm=ARGS.norm,
-                      length=ARGS.length, xlim=ARGS.xlim)
+                      length=ARGS.length, xlim=ARGS.xlim, dpi=ARGS.dpi)
 
 
 if __name__ == "__main__":
