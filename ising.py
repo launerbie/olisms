@@ -1,51 +1,57 @@
 #!/usr/bin/env python
 import time
 import numpy as np
-from itertools import permutations
-from pprint import pprint
 import subprocess
-np.set_printoptions(threshold=np.nan, linewidth= 300)
-
-def prod( iterable ):
-    p = 1
-    for n in iterable:
-        p *= n
-    return p
+from misc import product
+from misc import make_energy_map
+from misc import make_delta_energy_map
+from misc import neighbor_table
+from misc import probability_table
 
 class Ising(object):
-    def __init__(self, shape, sweeps, temperature=10, aligned=False, 
-                 mode='metropolis', handler=None, h5path=None, 
+    """ Missing docstring """
+    def __init__(self, shape, sweeps, temperature=10, aligned=False,
+                 mode='metropolis', handler=None, h5path=None,
                  saveinterval=1, skip_n_steps=0):
-        """ 
+        """
         Parameters
         ----------
-        shape : lattice shape 
+        shape : lattice shape
         sweeps : total number of sweeps to perform
-        temperature: temperature 
+        temperature: temperature
         aligned: create grid with all spins in the same direction
         mode : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
         saveinterval: interval (in sweeps) at which data is saved to hdf5
-        
-        TODO:
-        skip_n_steps: skip n steps before saving data 
-    
+
+
         """
         self.mode = mode
         self.shape = tuple(shape)
         self.dimension = len(shape)
-        self.temperature = temperature
-        self.handler = handler 
 
-        self.h5path = h5path 
+        if self.dimension == 2:
+            self.width = shape[0]
+            self.height = shape[1]
+        elif self.dimension == 3:
+            self.width = shape[0]
+            self.height = shape[1]
+            self.depth = shape[2]
+        else:
+            raise Exception("Unsupported dimension")
+
+        self.temperature = temperature
+        self.handler = handler
+
+        self.h5path = h5path
         self.sweeps = sweeps
         self.saveinterval = saveinterval
         self.skip_n_steps = skip_n_steps
 
-        self.ptable = self.make_probability_table()
+        self.ptable = probability_table(self.dimension, self.temperature)
 
-        self.lattice_size = prod(self.shape)
+        self.lattice_size = product(self.shape)
 
         if mode == 'metropolis':
             self.evolve = self.evolve_metropolis
@@ -60,24 +66,22 @@ class Ising(object):
             grid = np.random.randint(2, size=self.lattice_size)
             self.grid = np.array(grid, dtype=bool)
 
-        self.neighbor_table = self.make_neighbor_table()
-        self.dE_map = self.make_dE_map()
-        self.energy_map = self.make_energy_map()
-        
-        # save simulation parameters here 
-        if (self.handler and self.h5path):
+        self.nbr_table_br = neighbor_table(self.width, only_below_right=True)
+        self.nbr_table = neighbor_table(self.width)
+        self.delta_energy_map = make_delta_energy_map()
+        self.energy_map = make_energy_map()
+
+        # save simulation parameters here
+        if self.handler and self.h5path:
             self.writehdf5 = True
             self.handler.append(np.array(self.shape), self.h5path+'shape')
             self.handler.append(self.temperature, self.h5path+'temperature')
             self.handler.append(self.lattice_size, self.h5path+'lattice_size')
             self.handler.append(self.saveinterval, self.h5path+'saveinterval')
-            self.handler.append(np.array(self.grid, dtype='int8'), 
+            self.handler.append(np.array(self.grid, dtype='int8'),
                                 self.h5path+'initgrid', dtype='int8')
 
-            try:
-                commit = subprocess.check_output(["git", "rev-parse","HEAD"])
-            except:
-                commit = "Unknown"
+            commit = subprocess.check_output(["git", "rev-parse", "HEAD"])
 
             #consider numpy.string_(commit)
             self.handler.file.attrs['commit'] = commit
@@ -87,257 +91,62 @@ class Ising(object):
         else:
             self.writehdf5 = False
 
-    #boolean array version
     @property
     def magnetization(self):
-        M = 2*self.grid.sum() - len(self.grid)
-        return M
+        """ Returns the total magnetization for a boolean array. """
+        magnetization = 2*self.grid.sum() - len(self.grid)
+        return magnetization
 
-    def make_probability_table(self):
-        if self.dimension == 2:
-            delta_energies = [-8, -4, 0, 4, 8] 
-        elif self.dimension == 3:
-            delta_energies = [-12, -8, -4, 0, 4, 8, 12]  
-        else:
-            s = "No probability table for lattice dimension "
-            raise ValueError(s+"{}".format(self.dimension))
-
-        ptable = dict() 
-        for dE in delta_energies:
-            ptable.update({dE:np.exp(-dE/self.temperature)}) 
-        return ptable
-   
-    def make_neighbor_table(self):
+    def calc_energy(self):
         """
-        Returns a dictionary where the keys are the sites and the values
-        are the neighbors. So for a 4x4 lattice we have:
-
-            {0: (1, 15, 4, 12),
-             1: (2, 0, 5, 13),
-             2: (3, 1, 6, 14),
-             3: (4, 2, 7, 15),
-             4: (5, 3, 8, 0),
-             5: (6, 4, 9, 1),
-             6: (7, 5, 10, 2),
-             7: (8, 6, 11, 3),
-             8: (9, 7, 12, 4),
-             9: (10, 8, 13, 5),
-             10: (11, 9, 14, 6),
-             11: (12, 10, 15, 7),
-             12: (13, 11, 0, 8),
-             13: (14, 12, 1, 9),
-             14: (15, 13, 2, 10),
-             15: (0, 14, 3, 11)}
-
-        """
-        nbr_table_helical = dict()                              
-        for site in range(self.lattice_size):
-            nbr_table_helical.update({site:self.nn_helical_bc_2D(site)})
-        return nbr_table_helical
-
-    def make_energy_map(self):
-        """
-        This functions returns this dictionary:
-        {(False, (False, False)): 2,
-         (False, (False, True)): 0,
-         (False, (True, False)): 0,
-         (False, (True, True)): -2,
-         (True, (False, False)): -2,
-         (True, (False, True)): 0,
-         (True, (True, False)): 0,
-         (True, (True, True)): 2}
-        """
-        energy_map = dict()
-
-        #possible below and right neighbors
-        config1 = (True, True)   
-        config2 = (True, False)  
-        config3 = (False, False) 
-
-        for perm in set(permutations(config1)):
-            energy_map.update({(True,perm):2})
-            energy_map.update({(False,perm):-2})
-
-        for perm in set(permutations(config2)):
-            energy_map.update({(True,perm):0})
-            energy_map.update({(False,perm):0})
-
-        for perm in set(permutations(config3)):
-            energy_map.update({(True,perm):-2})
-            energy_map.update({(False,perm):2})
-   
-        return energy_map
-
-    def make_dE_map(self):
-        """
-        {(False, (False, False, False, False)): 8,
-         (False, (False, False, False, True)): 4,
-         (False, (False, False, True, False)): 4,
-         (False, (False, False, True, True)): 0,
-         (False, (False, True, False, False)): 4,
-         (False, (False, True, False, True)): 0,
-         (False, (False, True, True, False)): 0,
-         (False, (False, True, True, True)): -4,
-         (False, (True, False, False, False)): 4,
-         (False, (True, False, False, True)): 0,
-         (False, (True, False, True, False)): 0,
-         (False, (True, False, True, True)): -4,
-         (False, (True, True, False, False)): 0,
-         (False, (True, True, False, True)): -4,
-         (False, (True, True, True, False)): -4,
-         (False, (True, True, True, True)): -8,
-         (True, (False, False, False, False)): -8,
-         (True, (False, False, False, True)): -4,
-         (True, (False, False, True, False)): -4,
-         (True, (False, False, True, True)): 0,
-         (True, (False, True, False, False)): -4,
-         (True, (False, True, False, True)): 0,
-         (True, (False, True, True, False)): 0,
-         (True, (False, True, True, True)): 4,
-         (True, (True, False, False, False)): -4,
-         (True, (True, False, False, True)): 0,
-         (True, (True, False, True, False)): 0,
-         (True, (True, False, True, True)): 4,
-         (True, (True, True, False, False)): 0,
-         (True, (True, True, False, True)): 4,
-         (True, (True, True, True, False)): 4,
-         (True, (True, True, True, True)): 8}
-        """
-        
-        dE_map = dict()
-
-        #possible neighbors
-        config1 = (True,True,True,True)     
-        config2 = (True,True,True,False)    
-        config3 = (True,True,False,False)   
-        config4 = (True,False,False,False) 
-        config5 = (False,False,False,False)
-
-        #CHECK THESE!
-        for perm in set(permutations(config1)):
-            dE_map.update({(True,perm):8})
-            dE_map.update({(False,perm):-8})
-
-        for perm in set(permutations(config2)):
-            dE_map.update({(True,perm):4})
-            dE_map.update({(False,perm):-4})
-
-        for perm in set(permutations(config3)):
-            dE_map.update({(True,perm) :0})
-            dE_map.update({(False,perm) :0})
-
-        for perm in set(permutations(config4)):
-            dE_map.update({(True,perm):-4})
-            dE_map.update({(False,perm):4})
-
-        for perm in set(permutations(config5)):
-            dE_map.update({(True,perm):-8})
-            dE_map.update({(False,perm):8})
-   
-        return dE_map
-
-    def nn_helical_bc_2D(self, site):                                                               
-        """                                                                                   
-        site: int                                                                             
-        L: int                                                                                
-                                                                                              
-        Here i,j,k,l are the nearest neighbor indices for an ndarray of                       
-        shape (1,) with helical boundary conditions.                                          
-                                                                                              
-                                                                                              
-        So for example, here the neighbors of site=9 are shown:                               
-                                                                                              
-                                                                                              
-                                  above                                                       
-                              ------------|                                                   
-                             \|/          |                                                   
-        ----------------------------- L ----- R -----------------------------                 
-        | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |                 
-        ---------------------------------------------------------------------                 
-                                          |          /|\                                      
-                                          |------------                                       
-                                             below                                            
-                                                                                              
-                                                                                              
-         Which you can think of as a 2D lattice that looks like this:                         
-                                                                                              
-                                                                                              
-                                            -------------                                     
-          1   2   3   4   5   6   7   8   9 | 1 | 2 | 3 |                                     
-                                 ------------------------                                     
-          4   5   6   7   8   9 | 1 | 2 | 3 | 4 | 5 | 6 |                                     
-                     -------------------------------------                                    
-          7   8   9 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |                                     
-        ------------|------------------------------------                                     
-        | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 1 | 2 | 3 |                                     
-        ------------|------------------------------------                                     
-        | 4 | 5 | 6 | 7 | 8 | 9 | 1 | 2 | 3 | 4 | 5 | 6 |                                     
-        ------------|------------------------------------                                     
-        | 7 | 8 | 9 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |                                     
-        ------------|------------------------------------                                     
-        | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 1   2   3                                       
-        ------------|------------------------                                                 
-        | 4 | 5 | 6 | 7 | 8 | 9 | 1   2   3   4   5   6                                       
-        ------------|------------                                                             
-        | 7 | 8 | 9 | 1   2   3   4   5   6   7   8   9                                       
-        -------------                                                                         
-                                                                                              
-                                                                                              
-        """ 
-        L = self.shape[0] 
-        
-        i = (site+1) % L**2                                                                      
-        j = (site-1) % L**2                                                                      
-        k = (site+L) % L**2                                                                      
-        l = (site-L) % L**2                                                                      
-        return i,j,k,l    
-
-    def calc_energy(self): 
-        """
-        Function that iterates through the ising array and calculates product 
-        of its value with right and lower neighbor. 
+        Function that iterates through the ising array and calculates product
+        of its value with right and lower neighbor.
         """
         g = self.grid
         energy = 0
 
         for site in range(self.lattice_size):
-            below, above, right, left = self.neighbor_table[site]
-            key = (bool(g[site]), (bool(g[right]), bool(g[below])) ) 
+            below, right = self.nbr_table_br[site]
+            key = (bool(g[site]), (bool(g[right]), bool(g[below])))
             energy = energy + self.energy_map[key]
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
     def delta_energy(self, site):
-        """  Returns dE = E2 - E1  (right??)     """
+        """  Returns delta_energy = E2 - E1  (right??)     """
         g = self.grid
-        below, above, right, left = self.neighbor_table[site]
-        key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]), bool(g[left])) ) 
-        dE = self.dE_map[key] 
-        return dE 
+        below, above, right, left = self.nbr_table[site]
+        key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]),
+                               bool(g[left])))
+        delta_energy = self.delta_energy_map[key]
+        return delta_energy
 
-        
+
     def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
         """
         Evolve it using Metropolis.
         """
-        def sweep():
-            for i in range(self.lattice_size):
-                site = np.random.randint(0, self.lattice_size) #get this in chunks
-                dE = self.delta_energy(site) 
-                if dE <= 0: 
+        def do_sweep():
+            for _ in range(self.lattice_size):
+                site = np.random.randint(0, self.lattice_size)
+                delta_energy = self.delta_energy(site)
+                if delta_energy <= 0:
                     self.grid[site] = -self.grid[site]
-                elif np.random.ranf() <= self.ptable[dE]:
+                elif np.random.ranf() <= self.ptable[delta_energy]:
                     self.grid[site] = -self.grid[site]
-         
 
-        for s in range(self.sweeps):
-            pbar.update(s)
-            sweep()
-            
-            if s % self.saveinterval == 0 and s >= self.skip_n_steps:
+
+        for sweep in range(self.sweeps):
+            pbar.update(sweep)
+            do_sweep()
+
+            if sweep % self.saveinterval == 0 and sweep >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.append(s, self.h5path+'sweep', dtype='int16')
-                    self.handler.append(self.calc_energy(), self.h5path+'energy')
-                    self.handler.append(self.magnetization, self.h5path+'magnetization')
+                    self.handler.append(sweep, self.h5path+'sweep',
+                                        dtype='int16')
+                    self.handler.append(self.calc_energy(),
+                                        self.h5path+'energy')
+                    self.handler.append(self.magnetization,
+                                        self.h5path+'magnetization')
 
         self.handler.append(self.grid, self.h5path+'finalstate')
 
@@ -348,23 +157,19 @@ class Ising(object):
         """
         g = self.grid
 
-        J = 1
-        kB = 1
-        bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
+        bond_probability = 1 - np.exp(-2/self.temperature)
 
-        self.i=0
+        for flip in range(self.sweeps):
+            pbar.update(flip)
 
-        while self.i < self.sweeps:
-            pbar.update(self.i)
-
-            cluster = list() 
+            cluster = list()
             perimeter = list()
 
             seed = np.random.randint(0, self.lattice_size)
             seed_spin = g[seed]
             cluster.append(seed)
 
-            nbrs = self.neighbor_table[seed]
+            nbrs = self.nbr_table[seed]
 
             for nbr in nbrs:
                 if seed_spin == g[nbr]:
@@ -378,10 +183,10 @@ class Ising(object):
                 if seed_spin == g[site_to_test]:
                     determinant = np.random.ranf()
 
-                    if determinant <= bond_probability: 
+                    if determinant <= bond_probability:
                         cluster.append(site_to_test)
 
-                        nbrs = self.neighbor_table[site_to_test]
+                        nbrs = self.nbr_table[site_to_test]
                         for nbr in nbrs:
                             if nbr not in cluster and nbr not in perimeter:
                                 perimeter.append(nbr)
@@ -389,59 +194,62 @@ class Ising(object):
             #flip cluster
             g[np.array(cluster)] = -seed_spin
 
-            if self.i % self.saveinterval == 0 and self.i >= self.skip_n_steps:
+            if flip % self.saveinterval == 0 and flip >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.append(self.i, self.h5path+'clusterflip', dtype='int16')
-                    self.handler.append(self.calc_energy(), self.h5path+'energy')
-                    self.handler.append(self.magnetization, self.h5path+'magnetization')
+                    self.handler.append(flip, self.h5path+'clusterflip',
+                                        dtype='int16')
+                    self.handler.append(self.calc_energy(),
+                                        self.h5path+'energy')
+                    self.handler.append(self.magnetization,
+                                        self.h5path+'magnetization')
 
-            self.i += 1
 
         self.handler.append(self.grid, self.h5path+'finalstate')
 
     def print_sim_parameters(self):
 
         sweeps = self.sweeps
-        Lx = self.shape[0] 
-        Ly = self.shape[1]
-        N = Lx*Ly
-        saveinterval_in_iterations = N*self.saveinterval
+        width = self.shape[0]
+        height = self.shape[1]
+        lattice_size = width * height
+        saveinterval_in_iterations = lattice_size * self.saveinterval
 
-        total_iters = sweeps * Lx * Ly 
+        total_iters = sweeps * lattice_size
 
         try:
-            Lz = self.shape[2]
-            N = Lx*Ly*Lz
-            total_iters = sweeps * Lx * Ly * Lz
+            depth = self.shape[2]
+            lattice_size = width * height * depth
+            total_iters = sweeps * lattice_size
         except (IndexError, NameError):
             pass
 
         if self.mode == 'metropolis':
-            s = """
-            h5path             : {}   
-            Algorithm          : {}  
-            Lattice Shape      : {}  
+            simparams = """
+            h5path             : {}
+            Algorithm          : {}
+            Lattice Shape      : {}
             Lattice Size       : {}
-            Temperature        : {}   
+            Temperature        : {}
             Sweeps to perform  : {} (1 sweep = {} iterations)
-            Total Iterations   : {} ({} * {} * {}) 
+            Total Iterations   : {} ({} * {} * {})
             Saving state every : {} sweeps (every {} iterations)
-            """.format(self.h5path, self.mode, self.shape, N, self.temperature,
-                       sweeps, N ,total_iters, sweeps, Lx, Ly, 
+            """.format(self.h5path, self.mode, self.shape, lattice_size,
+                       self.temperature,
+                       sweeps, lattice_size, total_iters, sweeps, width, height,
                        self.saveinterval, saveinterval_in_iterations)
 
         elif self.mode == 'wolff':
-            s = """
-            h5path             : {}   
-            Algorithm          : {}  
-            Lattice Shape      : {}  
+            simparams = """
+            h5path             : {}
+            Algorithm          : {}
+            Lattice Shape      : {}
             Lattice Size       : {}
-            Temperature        : {}   
-            Cluster flips      : {} 
+            Temperature        : {}
+            Cluster flips      : {}
             Saving state every : {} cluster flips
-            """.format(self.h5path, self.mode, self.shape, N, self.temperature,
-                       sweeps, self.saveinterval)
-        print(s)
+            """.format(self.h5path, self.mode, self.shape, lattice_size,
+                       self.temperature, sweeps, self.saveinterval)
+        print(simparams)
         #TODO
         #3D version
 
@@ -449,41 +257,39 @@ class IsingAnim(Ising):
     def evolve_metropolis(self, sleep=0):
         self.sweepcount = 0
         def sweep():
-            for i in range(self.lattice_size):
-                site = np.random.randint(0, self.lattice_size) #get this in chunks
-                dE = self.delta_energy(site) 
-                if dE <= 0: 
+            for _ in range(self.lattice_size):
+                site = np.random.randint(0, self.lattice_size)
+                delta_energy = self.delta_energy(site)
+                if delta_energy <= 0:
                     self.grid[site] = -self.grid[site]
-                elif np.random.ranf() < self.ptable[dE]:
+                elif np.random.ranf() < self.ptable[delta_energy]:
                     self.grid[site] = -self.grid[site]
-         
+
 
         for s in range(self.sweeps):
             time.sleep(sleep)
             sweep()
-            self.sweepcount += 1 
-            
+            self.sweepcount += 1
+
 
     def evolve_wolff(self, sleep=0):
         g = self.grid
 
-        J = 1
-        kB = 1
-        bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
+        bond_probability = 1 - np.exp(-2/self.temperature)
 
-        self.sweepcount=0
+        self.sweepcount = 0
 
         while self.sweepcount < self.sweeps:
             time.sleep(sleep)
 
-            cluster = list() 
+            cluster = list()
             perimeter = list()
 
             seed = np.random.randint(0, self.lattice_size)
             seed_spin = g[seed]
             cluster.append(seed)
 
-            nbrs = self.neighbor_table[seed]
+            nbrs = self.nbr_table[seed]
 
             for nbr in nbrs:
                 if seed_spin == g[nbr]:
@@ -497,10 +303,10 @@ class IsingAnim(Ising):
                 if seed_spin == g[site_to_test]:
                     determinant = np.random.ranf()
 
-                    if determinant <= bond_probability: 
+                    if determinant <= bond_probability:
                         cluster.append(site_to_test)
 
-                        nbrs = self.neighbor_table[site_to_test]
+                        nbrs = self.nbr_table[site_to_test]
                         for nbr in nbrs:
                             if nbr not in cluster and nbr not in perimeter:
                                 perimeter.append(nbr)
@@ -508,8 +314,6 @@ class IsingAnim(Ising):
             #flip cluster
             g[np.array(cluster)] = -seed_spin
 
-
             self.sweepcount += 1
-
 
 

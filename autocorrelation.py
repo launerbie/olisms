@@ -8,7 +8,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import argparse
-import progressbar 
+import progressbar
 from colors import rundark
 from colors import runbright
 from misc import drawwidget
@@ -25,23 +25,23 @@ def make_acf_plot(h5pyfile, name, **kwargs):
     ----------
     Valid keyword arguments are:
 
-    h5path : str 
+    h5path : str
         Pass an h5path to specify which data you want use, typically h5path
         is either "energy" or "magnetization". Since ['sim_0000']['energy'])
-        or ['sim_0000']['magnetization'] are timeseries data for which you 
+        or ['sim_0000']['magnetization'] are timeseries data for which you
         want to calculate the time autocorrelation function.
-      
+
     norminterval: (float, float). Default: (1.4, 1.6)
         Used to normalize the color range between (vmin, vmax).
-       
+
     cmap: A matplotlib colormap. Default: matplotlib.cm.hot
-        
+
     length: int
         The maximum time lag. Used as range(1, length), thereby calculating
         (length - 1) correlation coefficients.
 
-    xlim: int
-        The right x axes limit.
+    xlim: (int, int)
+        The x axes limits.
 
     img_suffix: str
 
