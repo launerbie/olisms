@@ -61,9 +61,22 @@ class Ising(object):
             self.grid = np.array(grid, dtype=bool)
 
         self.neighbor_table = self.make_neighbor_table()
-        self.dE_map = self.make_dE_map()
-        self.energy_map = self.make_energy_map()
-        
+
+        if self.dimension == 2:
+            self.dE_map = self.make_dE_map()
+        elif self.dimension == 3:
+            self.dE_map = self.make_3D_dE_map()
+        else:
+            raise ValueError("Dimension not supported")
+
+        if self.dimension == 2:
+            self.energy_map = self.make_energy_map()
+        elif self.dimension == 3:
+            self.energy_map = self.make_3D_energy_map()
+        else:
+            raise ValueError("Dimension not supported")
+            
+
         # save simulation parameters here 
         if (self.handler and self.h5path):
             self.writehdf5 = True
@@ -93,6 +106,8 @@ class Ising(object):
         M = 2*self.grid.sum() - len(self.grid)
         return M
 
+
+
     def make_probability_table(self):
         if self.dimension == 2:
             delta_energies = [-8, -4, 0, 4, 8] 
@@ -106,6 +121,8 @@ class Ising(object):
         for dE in delta_energies:
             ptable.update({dE:np.exp(-dE/self.temperature)}) 
         return ptable
+
+
    
     def make_neighbor_table(self):
         """
@@ -130,10 +147,21 @@ class Ising(object):
              15: (0, 14, 3, 11)}
 
         """
-        nbr_table_helical = dict()                              
+        nbr_table_helical = dict()   
+        if self.dimension == 2:
+            nn_function = self.nn_helical_bc_2D
+        elif self.dimension == 3:
+            nn_function = self.nn_helical_bc_3D
+        else:
+            s = "No neighbor table for lattice dimension "
+            raise ValueError(s+"{}".format(self.dimension))
+                   
         for site in range(self.lattice_size):
-            nbr_table_helical.update({site:self.nn_helical_bc_2D(site)})
+            nbr_table_helical.update({site:nn_function(site)})
         return nbr_table_helical
+
+
+
 
     def make_energy_map(self):
         """
@@ -167,6 +195,55 @@ class Ising(object):
             energy_map.update({(False,perm):2})
    
         return energy_map
+
+
+    def make_3D_energy_map(self):
+        """
+        This functions returns this dictionary:
+        {(False, (False, False, False)): 3,
+         (False, (False, False, True)): 1,
+         (False, (False, True, False)): 1,
+         (False, (True, False, False)): 1,
+         (False, (True, True, Flase)): -1,
+         (False, (True, False, True)): -1,
+         (False, (False, True, True)): -1,
+         (False, (True, True, True)): -3,
+         (True, (False, False, False)): -3,
+         (True, (False, False, True)): -1,
+         (True, (False, True, False)): -1,
+         (True, (True, False, False)): -1,
+         (True, (True, True, Flase)): 1,
+         (True, (True, False, True)): 1,
+         (True, (False, True, True)): 1,
+         (True, (True, True, True)): 3,
+        """
+        energy_map = dict()
+
+        #possible below, right and front neighbors
+        config1 = (True, True, True)   
+        config2 = (True, True, False)   
+        config3 = (True, False, False)   
+        config4 = (False, False, False)   
+
+        for perm in set(permutations(config1)):
+            energy_map.update({(True,perm):3})
+            energy_map.update({(False,perm):-3})
+
+        for perm in set(permutations(config2)):
+            energy_map.update({(True,perm):1})
+            energy_map.update({(False,perm):-1})
+
+        for perm in set(permutations(config3)):
+            energy_map.update({(True,perm):-1})
+            energy_map.update({(False,perm):1})
+   
+        for perm in set(permutations(config4)):
+            energy_map.update({(True,perm):-3})
+            energy_map.update({(False,perm):3})
+
+        return energy_map
+
+
 
     def make_dE_map(self):
         """
@@ -236,6 +313,53 @@ class Ising(object):
    
         return dE_map
 
+
+    def make_3D_dE_map(self):
+        """ A straightforward addition to the 2D varaiant """
+
+        dE_map = dict()
+
+        #possible neighbors
+        config1 = (True, True, True, True, True, True)     
+        config2 = (True, True, True, True, True, False)     
+        config3 = (True, True, True, True, False, False)     
+        config4 = (True, True, True, False, False, False)     
+        config5 = (True, True, False, False, False, False)     
+        config6 = (True, False, False, False, False, False)     
+        config7 = (False, False, False, False, False, False)     
+
+        #CHECK THESE!
+        for perm in set(permutations(config1)):
+            dE_map.update({(True,perm):12})
+            dE_map.update({(False,perm):-12})
+
+        for perm in set(permutations(config2)):
+            dE_map.update({(True,perm):8})
+            dE_map.update({(False,perm):-8})
+
+        for perm in set(permutations(config3)):
+            dE_map.update({(True,perm):4})
+            dE_map.update({(False,perm):-4})
+
+        for perm in set(permutations(config4)):
+            dE_map.update({(True,perm) :0})
+            dE_map.update({(False,perm) :0})
+
+        for perm in set(permutations(config5)):
+            dE_map.update({(True,perm):-4})
+            dE_map.update({(False,perm):4})
+
+        for perm in set(permutations(config6)):
+            dE_map.update({(True,perm):-8})
+            dE_map.update({(False,perm):8})
+   
+        for perm in set(permutations(config7)):
+            dE_map.update({(True,perm):-12})
+            dE_map.update({(False,perm):12})
+
+        return dE_map
+
+
     def nn_helical_bc_2D(self, site):                                                               
         """                                                                                   
         site: int                                                                             
@@ -292,6 +416,40 @@ class Ising(object):
         l = (site-L) % L**2                                                                      
         return i,j,k,l    
 
+
+
+    def nn_helical_bc_3D(self, site):                                                               
+        """                                                                                   
+        Same idea as the 2D variant, just now it's some kind of hyperdougnut.
+        """ 
+        L = self.shape[0] 
+        
+        i = (site+1) % L**3                                                                      
+        j = (site-1) % L**3                                                                      
+        k = (site+L) % L**3                                                                      
+        l = (site-L) % L**3                                                                      
+        m = (site+L**2) % L**3 
+        n = (site-L**2) % L**3
+        return i,j,k,l,m,n
+    
+
+    
+    def calc_energy_3D(self): 
+        """
+        Function that iterates through the ising array and calculates product 
+        of its value with right and lower neighbor. 
+        """
+        g = self.grid
+        energy = 0
+
+        for site in range(self.lattice_size):
+            below, above, right, left, front, back = self.neighbor_table[site]
+            key = (bool(g[site]), (bool(g[right]), bool(g[below]), bool(g[front])) ) 
+            energy = energy + self.energy_map[key]
+        return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
+
+   
+ 
     def calc_energy(self): 
         """
         Function that iterates through the ising array and calculates product 
@@ -306,6 +464,8 @@ class Ising(object):
             energy = energy + self.energy_map[key]
         return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
 
+
+
     def delta_energy(self, site):
         """  Returns dE = E2 - E1  (right??)     """
         g = self.grid
@@ -314,15 +474,35 @@ class Ising(object):
         dE = self.dE_map[key] 
         return dE 
 
-        
+
+
+    def delta_energy_3D(self, site):
+        """  Returns dE = E2 - E1  (right??)     """
+        g = self.grid
+        below, above, right, left, front, back = self.neighbor_table[site]
+        key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]),
+               bool(g[left]), bool(g[front]), bool(g[back])) ) 
+        dE = self.dE_map[key] 
+        return dE 
+    
+
+    
     def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
         """
         Evolve it using Metropolis.
         """
+
+        if self.dimension == 2:
+            delta_energy_function = self.delta_energy
+            calc_energy_function = self.calc_energy
+        elif self.dimension == 3:
+            delta_energy_function = self.delta_energy_3D
+            calc_energy_function = self.calc_energy_3D
+
         def sweep():
             for i in range(self.lattice_size):
                 site = np.random.randint(0, self.lattice_size) #get this in chunks
-                dE = self.delta_energy(site) 
+                dE = delta_energy_function(site) 
                 if dE <= 0: 
                     self.grid[site] = -self.grid[site]
                 elif np.random.ranf() <= self.ptable[dE]:
@@ -336,7 +516,7 @@ class Ising(object):
             if s % self.saveinterval == 0 and s >= self.skip_n_steps:
                 if self.writehdf5:
                     self.handler.append(s, self.h5path+'sweep', dtype='int16')
-                    self.handler.append(self.calc_energy(), self.h5path+'energy')
+                    self.handler.append(calc_energy_function(), self.h5path+'energy')
                     self.handler.append(self.magnetization, self.h5path+'magnetization')
 
         self.handler.append(self.grid, self.h5path+'finalstate')
@@ -353,6 +533,12 @@ class Ising(object):
         bond_probability = 1 - np.exp(-2*J/(kB*self.temperature))
 
         self.i=0
+
+        if self.dimension == 2:
+            calc_energy_function = self.calc_energy
+        elif self.dimension == 3:
+            calc_energy_function = self.calc_energy_3D
+
 
         while self.i < self.sweeps:
             pbar.update(self.i)
@@ -392,7 +578,7 @@ class Ising(object):
             if self.i % self.saveinterval == 0 and self.i >= self.skip_n_steps:
                 if self.writehdf5:
                     self.handler.append(self.i, self.h5path+'clusterflip', dtype='int16')
-                    self.handler.append(self.calc_energy(), self.h5path+'energy')
+                    self.handler.append(calc_energy_function(), self.h5path+'energy')
                     self.handler.append(self.magnetization, self.h5path+'magnetization')
 
             self.i += 1
