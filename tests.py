@@ -3,7 +3,7 @@ import argparse
 import numpy
 import unittest
 import ising
-from colored import ColoredTextTestRunner
+from ext.colored import ColoredTextTestRunner
 
 class test_TotalEnergy_2D(unittest.TestCase):
     def setUp(self):

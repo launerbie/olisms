@@ -5,9 +5,9 @@ import os
 import sys
 import argparse
 import numpy
-import progressbar as pb
-
 from ising import Ising
+
+import ext.progressbar as pb
 from ext.hdf5handler import HDF5Handler
 
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 import os
-import progressbar
+import ext.progressbar as progressbar
 from itertools import permutations
 
 """ misc.py - Place some often reused functions here """

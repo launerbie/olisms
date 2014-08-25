@@ -8,9 +8,9 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import argparse
-import progressbar
-from colors import rundark
-from colors import runbright
+import ext.progressbar as progressbar
+from ext.colors import rundark
+from ext.colors import runbright
 from misc import drawwidget
 from misc import get_basename
 from misc import acf
