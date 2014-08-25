@@ -5,6 +5,14 @@ import unittest
 import ising
 from ext.colored import ColoredTextTestRunner
 
+from ext.hdf5handler.run_tests import test_file_group_dataset_creation
+from ext.hdf5handler.run_tests import test_python_scalars
+from ext.hdf5handler.run_tests import test_python_lists
+from ext.hdf5handler.run_tests import test_python_tuples
+from ext.hdf5handler.run_tests import test_ndarrays
+from ext.hdf5handler.run_tests import test_prefix
+
+
 class test_TotalEnergy_2D(unittest.TestCase):
     def setUp(self):
         self.ising = ising.Ising(shape=(3,3), sweeps=1)
@@ -527,6 +535,12 @@ if __name__ == "__main__":
                   test_delta_energy_2D,
                   test_delta_energy_3D,
                   test_magnetization,
+                  # TODO: import HDF5 stuff as a suite
+                  test_file_group_dataset_creation,
+                  test_python_scalars,
+                  test_python_lists,
+                  test_ndarrays,
+                  test_prefix,
                  ]
 
     loader = unittest.TestLoader()
