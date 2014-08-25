@@ -84,6 +84,19 @@ class Ising(object):
     def print_sim_parameters(self):
         printer(self)
 
+    def set_grid(self, ndarr, spin_up=1, spin_down=-1):
+        """ doc """
+        g = ndarr.flatten()
+        g[np.where(g == spin_up)] = True
+        g[np.where(g == spin_down)] = False
+        self.shape = ndarr.shape
+        self.lattice_size = product(self.shape)
+        self.grid = g
+        self.delta_energy = get_delta_energy_function(self)
+        self.calc_energy = get_calc_energy_function(self)
+
+
+
     def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
         """ Evolve it using Metropolis. """
 
