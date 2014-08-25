@@ -8,7 +8,7 @@ import numpy
 import progressbar as pb
 
 from ising import Ising
-from hdf5utils import HDF5Handler
+from ext.hdf5handler import HDF5Handler
 
 
 def main():
@@ -33,7 +33,7 @@ def main():
                 print("Please input 'y' or 'n'\n")
     else:
         simulate()
-    
+
 
 def simulate():
     """
@@ -45,11 +45,11 @@ def simulate():
 
     with HDF5Handler(args.filename) as handler:
         for index, T in enumerate(temperatures):
-            h5path = "/"+"sim_"+str(index).zfill(4)+"/" 
+            h5path = "/"+"sim_"+str(index).zfill(4)+"/"
             # h5path thus looks like:
             # "/sim_0000/", "/sim_0001/", etc.
 
-            i = Ising(args.shape, args.sweeps, temperature=T, handler=handler, 
+            i = Ising(args.shape, args.sweeps, temperature=T, handler=handler,
                       h5path=h5path, aligned=args.aligned, mode=args.algorithm,
                       saveinterval=args.saveinterval, skip_n_steps=args.skip)
 
@@ -60,8 +60,8 @@ def simulate():
                               maxval=args.sweeps).start()
 
 
-            i.evolve(pbar) 
-        
+            i.evolve(pbar)
+
             pbar.finish()
 
             handler.file.flush()
@@ -80,12 +80,12 @@ def get_arguments():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-f', '--filename', help="hdf5 output file name", required=True)
-    parser.add_argument('-a', '--algorithm', 
-                        choices=['metropolis','wolff'], 
+    parser.add_argument('-a', '--algorithm',
+                        choices=['metropolis','wolff'],
                         default='metropolis')
     parser.add_argument('-s', '--sweeps', default=20000, type=int,
                         help="Number of sweeps, default: 20000")
-    parser.add_argument('--shape', default=[20, 20], type=int, 
+    parser.add_argument('--shape', default=[20, 20], type=int,
                         nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
     parser.add_argument('--tmin', default=1.5, type=float)

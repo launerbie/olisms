@@ -58,11 +58,11 @@ class Ising(object):
         # save simulation parameters here
         if self.handler and self.h5path:
             self.writehdf5 = True
-            self.handler.append(np.array(self.shape), self.h5path+'shape')
-            self.handler.append(self.temperature, self.h5path+'temperature')
-            self.handler.append(self.lattice_size, self.h5path+'lattice_size')
-            self.handler.append(self.saveinterval, self.h5path+'saveinterval')
-            self.handler.append(np.array(self.grid, dtype='int8'),
+            self.handler.put(np.array(self.shape), self.h5path+'shape')
+            self.handler.put(self.temperature, self.h5path+'temperature')
+            self.handler.put(self.lattice_size, self.h5path+'lattice_size')
+            self.handler.put(self.saveinterval, self.h5path+'saveinterval')
+            self.handler.put(np.array(self.grid, dtype='int8'),
                                 self.h5path+'initgrid', dtype='int8')
 
             commit = subprocess.check_output(["git", "rev-parse", "HEAD"])
@@ -115,14 +115,14 @@ class Ising(object):
 
             if sweep % self.saveinterval == 0 and sweep >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.append(sweep, self.h5path+'sweep',
+                    self.handler.put(sweep, self.h5path+'sweep',
                                         dtype='int16')
-                    self.handler.append(self.calc_energy(),
+                    self.handler.put(self.calc_energy(),
                                         self.h5path+'energy')
-                    self.handler.append(self.magnetization,
+                    self.handler.put(self.magnetization,
                                         self.h5path+'magnetization')
 
-        self.handler.append(self.grid, self.h5path+'finalstate')
+        self.handler.put(self.grid, self.h5path+'finalstate')
 
     def evolve_wolff(self, pbar):
         """ Ewolve it using Wolff's algorithm. """
@@ -168,15 +168,15 @@ class Ising(object):
 
             if flip % self.saveinterval == 0 and flip >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.append(flip, self.h5path+'clusterflip',
+                    self.handler.put(flip, self.h5path+'clusterflip',
                                         dtype='int16')
-                    self.handler.append(self.calc_energy(),
+                    self.handler.put(self.calc_energy(),
                                         self.h5path+'energy')
-                    self.handler.append(self.magnetization,
+                    self.handler.put(self.magnetization,
                                         self.h5path+'magnetization')
 
 
-        self.handler.append(self.grid, self.h5path+'finalstate')
+        self.handler.put(self.grid, self.h5path+'finalstate')
 
 
 class IsingAnim(Ising):

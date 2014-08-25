@@ -1,0 +1,3 @@
+[submodule "ext/hdf5handler"]
+	path = ext/hdf5handler
+	url = git@github.com:iambernie/hdf5handler.git
