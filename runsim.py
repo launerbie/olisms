@@ -2,24 +2,38 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import argparse
 import numpy
-
 from ising import Ising
-from hdf5utils import HDF5Handler
+
+import ext.progressbar as pb
+from ext.hdf5handler import HDF5Handler
 
 
 def main():
-    if args.filename:
-        if os.path.exists(args.filename):
-            print("{} already exists. Aborting.".format(args.filename))
-            exit(0)
-        else:
-            simulate()
+    if os.path.exists(args.filename):
+        pythonversion = sys.version_info[0]
 
+        key = None
+        while key not in ['y', 'n']:
+
+            if pythonversion == 2:
+                key = raw_input("{} exists. Overwrite? y/n: ".format(args.filename))
+            else:
+                key = input("{} exists. Overwrite? y/n: ".format(args.filename))
+
+            if key == 'y':
+                os.remove(args.filename)
+                simulate()
+            elif key == 'n':
+                print("Aborting runsim.py")
+                exit(0)
+            else:
+                print("Please input 'y' or 'n'\n")
     else:
-        pass #abort with message
-    
+        simulate()
+
 
 def simulate():
     """
@@ -30,38 +44,57 @@ def simulate():
     temperatures = numpy.linspace(args.tmin, args.tmax, args.steps)
 
     with HDF5Handler(args.filename) as handler:
-        simcount = 0
-        for T in temperatures:
-            print(T)
-            sim_str = str(simcount).zfill(4)
-            h5path = "/"+"sim_"+sim_str+"/"
-            i = Ising(args.shape, temperature=T, handler=handler, 
-                      h5path=h5path, aligned=args.aligned, mode=args.algorithm)
-            i.evolve(args.iterations) 
+        for index, T in enumerate(temperatures):
+            h5path = "/"+"sim_"+str(index).zfill(4)+"/"
+            # h5path thus looks like:
+            # "/sim_0000/", "/sim_0001/", etc.
 
-            simcount += 1
+            i = Ising(args.shape, args.sweeps, temperature=T, handler=handler,
+                      h5path=h5path, aligned=args.aligned, mode=args.algorithm,
+                      saveinterval=args.saveinterval, skip_n_steps=args.skip)
+
+            if args.verbose:
+                i.print_sim_parameters()
+
+            pbar = pb.ProgressBar(widgets=drawwidget("  T = {}  {}/{} ".format(round(T,4), index+1, len(temperatures))),
+                              maxval=args.sweeps).start()
+
+
+            i.evolve(pbar)
+
+            pbar.finish()
+
             handler.file.flush()
 
 
+def drawwidget(discription):
+    """ Formats the progressbar. """
+    widgets = [discription.ljust(20), pb.Percentage(), ' ',
+               pb.Bar(marker='#',left='[',right=']'),
+               ' ', pb.ETA()]
+    return widgets
+
+
+
 def get_arguments():
-    """
-    To add arguments, call: parser.add_argument
-    
-    """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-f', '--filename', help="hdf5 output file name")
-    parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'])
-    parser.add_argument('-i', '--iterations', default=100000, type=int,
-                        help="Number of iterations, default: 100000")
-    parser.add_argument('--shape', default=[40, 40], type=int, 
+    parser.add_argument('-f', '--filename', help="hdf5 output file name", required=True)
+    parser.add_argument('-a', '--algorithm',
+                        choices=['metropolis','wolff'],
+                        default='metropolis')
+    parser.add_argument('-s', '--sweeps', default=20000, type=int,
+                        help="Number of sweeps, default: 20000")
+    parser.add_argument('--shape', default=[20, 20], type=int,
                         nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
-    parser.add_argument('--tmin', default=0.1, type=float)
-    parser.add_argument('--tmax', default=10, type=float)
-    parser.add_argument('--steps', default=5, type=float)
-
-    #if len(args.shape) < 2, abort
+    parser.add_argument('--tmin', default=1.5, type=float)
+    parser.add_argument('--tmax', default=3.5, type=float)
+    parser.add_argument('--steps', default=10, type=float)
+    parser.add_argument('--saveinterval', default=50, type=int)
+    parser.add_argument('--skip', default=0, type=int)
+    parser.add_argument('--test', action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args()
     return args
@@ -69,5 +102,4 @@ def get_arguments():
 
 if __name__ == "__main__":
     args = get_arguments()
-    print(args)
     main()

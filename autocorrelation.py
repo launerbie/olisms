@@ -1,161 +1,157 @@
 #!/usr/bin/env python
 
+import os
 import h5py
 import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import argparse
+import ext.progressbar as progressbar
+from ext.colors import rundark
+from ext.colors import runbright
+from misc import drawwidget
+from misc import get_basename
+from misc import acf
 
-def main():
- 
-    f = h5py.File(args.filename)
-    
-#    autocorrelation_energy(f, args.n) 
-    autocorrelation_magnetization(f, args.n) 
-    
+# TODO: select only a subset of available Temperatures
+# TODO: seperate arguments for enery acf figure and magnetization acf figure
+# TODO: logscale
 
-def variance(input_array):
+def make_acf_plot(h5pyfile, name, **kwargs):
+    """
+    Parameters
+    ----------
+    Valid keyword arguments are:
 
-    arr_squared = input_array**2
-    
-    var = arr_squared.mean() - (input_array.mean())**2
+    h5path : str
+        Pass an h5path to specify which data you want use, typically h5path
+        is either "energy" or "magnetization". Since ['sim_0000']['energy'])
+        or ['sim_0000']['magnetization'] are timeseries data for which you
+        want to calculate the time autocorrelation function.
 
-    return var
+    norminterval: (float, float). Default: (1.4, 1.6)
+        Used to normalize the color range between (vmin, vmax).
 
+    cmap: A matplotlib colormap. Default: matplotlib.cm.hot
 
-def print_progress(counter, total, stepsize):
-    
-    if (counter)%(total/stepsize) == 0:
-        print('PROGRESS: ', counter/(total/100), '%')
+    length: int
+        The maximum time lag. Used as range(1, length), thereby calculating
+        (length - 1) correlation coefficients.
 
-def autocorrelation_energy(f, number_of_spins):
-    sims = f.values()
+    xlim: (int, int)
+        The x axes limits.
 
-    simulation_number = 1
-    for s in sims:
-        
-        print("\n", 'COMPUTING AUTOCORRELATION: SIMULATION', simulation_number,)
-        simulation_number = simulation_number + 1
+    img_suffix: str
 
-        figname = str(s.name)
+    targetdir: str, default = 'figures'
 
-        if (number_of_spins == None):
-            N = s['lattice_size'][0]
-        else:
-            N = number_of_spins #Included so that we can plot "old" data sets as well
-      
-        MSC0 = int(10*N)
+    """
 
-        energy = s['energy'][-MSC0:]
-        
-        '''
-        Hier implementeren: c_e(Dt) = <(E(t+Dt)-<E>)*(E(t)-<E>)>_t
-        '''
+    if 'h5path' not in kwargs:
+        raise Exception("Please specify timeseries data")
+    else:
+        h5path = kwargs['h5path']
 
-        size_energy = len(s['energy'][-MSC0:])
-        
-        avg_energy = s['energy'][-MSC0:].mean()
- 
-        delta_t = np.arange(size_energy)
-        correlation = [] 
-        
-        var = variance(energy)
+    # Set up figure parameters here
+    if 'norminterval' in kwargs:
+        norm = mpl.colors.Normalize(*kwargs['norminterval'])
+    else:
+        norm = mpl.colors.Normalize(vmin=1.4, vmax=3.6)
 
-        for k in delta_t:
-            summ = 0
-            i = 0
+    cmap = kwargs.get('cmap', cm.hot)
+    length = kwargs.get('length', 500)
+    dpi = kwargs.get('dpi', 80)
+    xlim = kwargs.get('xlim', None)
+    img_suffix = kwargs.get('img_suffix', '_{}_acf'.format(h5path))
+    targetdir = kwargs.get('targetdir', 'figures')
 
-            print_progress(k, size_energy, 10)
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
 
-            while i+k < size_energy:
-                summ = summ + (energy[i + k] - avg_energy)*(energy[i] - avg_energy)
-                i = i + 1
-            
-            c_van_delta_t = summ/var 
-            correlation.append(c_van_delta_t)
+    sims = h5pyfile.values()
+    firstsim = list(h5pyfile.values())[0]
+    shape = firstsim['shape'].value
+    algorithm = h5pyfile.attrs['mode']
 
-        corr_array = np.array(correlation)
-        
+    shape_as_string = str(shape[0][0])+" x "+str(shape[0][1])
+    # shape_as_string = "20 x 20"
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(delta_t, corr_array)
+    print("\nHDF5 file: {}".format(h5pyfile.filename))
+    processs_description = "Generating ACF {}: ".format(h5path)
+    pbar = progressbar.ProgressBar(widgets=drawwidget(processs_description),
+                                   maxval=len(sims)).start()
 
-        ax.set_xlabel('delta_t')
-        ax.set_ylabel('c_e')
- 
-        plt.savefig('plots2'+figname+"energy_autocorrelation"+".png")   
+    for simnr, sim in enumerate(sims):
+        pbar.update(simnr)
+        temperature = sim['temperature'][0]
+        timeseriesdata = sim[h5path]
+        ax1.plot(acf(timeseriesdata, length), c=cmap(norm(temperature)))
 
-def autocorrelation_magnetization(f, number_of_spins):
-    sims = f.values()
+    if algorithm == 'metropolis':
+        ax1.set_xlabel('lag [in sweeps ]')
 
-    simulation_number = 1
-    for s in sims:
-        
-        print("\n", 'SIMULATION', simulation_number,)
-        simulation_number = simulation_number + 1
+    elif algorithm == 'wolff':
+        ax1.set_xlabel('lag [in clusterflips]')
 
-        figname = str(s.name)
+    else:
+        ax1.set_xlabel('lag [in ??]')
 
-        if (number_of_spins == None):
-            N = s['lattice_size'][0]
-        else:
-            N = number_of_spins #Included so that we can plot "old" data sets as well
-       
-        MSC0 = int(10*N)
+    ax1.set_ylabel('C (lag)')
 
-        magnetization = s['magnetization'][-MSC0:]
-        
-        '''
-        Hier implementeren: c_m(Dt) = <(M(t+Dt)-<M>)*(M(t)-<M>)>_t
-        '''
+    if xlim:
+        ax1.set_xlim(*xlim)
 
-        size_magnetization = len(s['magnetization'][-MSC0:])
-        
-        avg_magnetization = s['magnetization'][-MSC0:].mean()
- 
-        delta_t = np.arange(size_magnetization)
-        correlation = [] 
-        
-        var = variance(magnetization)
+    ax1.set_ylim(-0.1, 1)
 
-        for k in delta_t:
-            summ = 0
-            i = 0
+    substitutions = (h5path, shape_as_string, algorithm)
+    ax1.set_title("Time series data: {} \n{} {}".format(*substitutions))
 
-            print_progress(k, size_magnetization, 10)
+    scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    scalarmap._A = [] #How to get around this?
+    cbbar_handle = plt.colorbar(scalarmap)
+    cbbar_handle.set_label('Temperature')
 
-            while i+k < size_magnetization:
-                summ = summ + (magnetization[i + k] - avg_magnetization)*(magnetization[i] - avg_magnetization)
-                i = i + 1
-            
-            c_van_delta_t = summ/var 
-            correlation.append(c_van_delta_t)
+    plt.savefig(targetdir + "/" + name + img_suffix + ".png",
+                bbox_inches='tight', dpi=dpi)
 
-        corr_array = np.array(correlation)
-        
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(delta_t, corr_array)
-
-        ax.set_xlabel('delta_t')
-        ax.set_ylabel('c_m')
- 
-        plt.savefig('plots3'+figname+"magnetization_autocorrelation"+".png")   
+    pbar.finish()
 
 def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename', metavar="HDF5 FILENAME")
-    parser.add_argument('-n', default = None, type = int,
-                       help="Number of spins. Specify only if hdf5 file does not include this info.")
+    parser.add_argument('filenames', nargs="+")
+    parser.add_argument('--targetdir', default='figures')
+    parser.add_argument('--xlim', nargs=2, metavar="xbegin xend", type=int)
+    parser.add_argument('--norm', nargs=2, metavar="vmin vmax", type=float)
+    parser.add_argument('--length', default=500, type=int)
+    parser.add_argument('--runbright', action="store_true")
+    parser.add_argument('--dpi', default=80, type=int)
+    arguments = parser.parse_args()
+    return arguments
 
-    args = parser.parse_args()
-    return args
+def main():
+    """ Create figures in the target directory ARGS.targetdir. """
+    if ARGS.runbright:
+        runbright()
+    else:
+        rundark()
+
+    if not os.path.exists(ARGS.targetdir):
+        os.makedirs(ARGS.targetdir)
+
+    for hdf5file in ARGS.filenames:
+        h5pyfile = h5py.File(hdf5file)
+
+        name = get_basename(hdf5file)
+        # get_basename('path_to/myfile.hdf5') = 'myfile'
+
+        make_acf_plot(h5pyfile, name, h5path='magnetization', norm=ARGS.norm,
+                      length=ARGS.length, xlim=ARGS.xlim, dpi=ARGS.dpi)
+        make_acf_plot(h5pyfile, name, h5path='energy', norm=ARGS.norm,
+                      length=ARGS.length, xlim=ARGS.xlim, dpi=ARGS.dpi)
+
 
 if __name__ == "__main__":
-    args = get_arguments()
-    print(args)
+    ARGS = get_arguments()
     main()
-
-
-
