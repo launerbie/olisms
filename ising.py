@@ -3,10 +3,11 @@ import time
 import numpy as np
 import subprocess
 from misc import product
-from misc import make_energy_map
-from misc import make_delta_energy_map
 from misc import neighbor_table
 from misc import probability_table
+from misc import get_delta_energy_function
+from misc import get_calc_energy_function
+from misc import print_sim_parameters as printer
 
 class Ising(object):
     """ Missing docstring """
@@ -24,34 +25,8 @@ class Ising(object):
         handler: HDF5Handler instance
         h5path: unix-style path, used as address in the hdf5 file
         saveinterval: interval (in sweeps) at which data is saved to hdf5
-
-
         """
         self.mode = mode
-        self.shape = tuple(shape)
-        self.dimension = len(shape)
-
-        if self.dimension == 2:
-            self.width = shape[0]
-            self.height = shape[1]
-        elif self.dimension == 3:
-            self.width = shape[0]
-            self.height = shape[1]
-            self.depth = shape[2]
-        else:
-            raise Exception("Unsupported dimension")
-
-        self.temperature = temperature
-        self.handler = handler
-
-        self.h5path = h5path
-        self.sweeps = sweeps
-        self.saveinterval = saveinterval
-        self.skip_n_steps = skip_n_steps
-
-        self.ptable = probability_table(self.dimension, self.temperature)
-
-        self.lattice_size = product(self.shape)
 
         if mode == 'metropolis':
             self.evolve = self.evolve_metropolis
@@ -60,16 +35,25 @@ class Ising(object):
         else:
             raise ValueError("Unknown mode")
 
+        self.shape = tuple(shape)
+        self.temperature = temperature
+        self.handler = handler
+        self.h5path = h5path
+        self.sweeps = sweeps
+        self.saveinterval = saveinterval
+        self.skip_n_steps = skip_n_steps
+        self.lattice_size = product(self.shape)
+
         if aligned:
             self.grid = np.ones(self.lattice_size, dtype=bool)
         else:
             grid = np.random.randint(2, size=self.lattice_size)
             self.grid = np.array(grid, dtype=bool)
 
-        self.nbr_table_br = neighbor_table(self.width, only_below_right=True)
-        self.nbr_table = neighbor_table(self.width)
-        self.delta_energy_map = make_delta_energy_map()
-        self.energy_map = make_energy_map()
+        self.ptable = probability_table(self.shape, self.temperature)
+        self.nbr_table = neighbor_table(self.shape)
+        self.delta_energy = get_delta_energy_function(self)
+        self.calc_energy = get_calc_energy_function(self)
 
         # save simulation parameters here
         if self.handler and self.h5path:
@@ -97,34 +81,12 @@ class Ising(object):
         magnetization = 2*self.grid.sum() - len(self.grid)
         return magnetization
 
-    def calc_energy(self):
-        """
-        Function that iterates through the ising array and calculates product
-        of its value with right and lower neighbor.
-        """
-        g = self.grid
-        energy = 0
-
-        for site in range(self.lattice_size):
-            below, right = self.nbr_table_br[site]
-            key = (bool(g[site]), (bool(g[right]), bool(g[below])))
-            energy = energy + self.energy_map[key]
-        return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
-
-    def delta_energy(self, site):
-        """  Returns delta_energy = E2 - E1  (right??)     """
-        g = self.grid
-        below, above, right, left = self.nbr_table[site]
-        key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]),
-                               bool(g[left])))
-        delta_energy = self.delta_energy_map[key]
-        return delta_energy
-
+    def print_sim_parameters(self):
+        printer(self)
 
     def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
-        """
-        Evolve it using Metropolis.
-        """
+        """ Evolve it using Metropolis. """
+
         def do_sweep():
             for _ in range(self.lattice_size):
                 site = np.random.randint(0, self.lattice_size)
@@ -133,7 +95,6 @@ class Ising(object):
                     self.grid[site] = -self.grid[site]
                 elif np.random.ranf() <= self.ptable[delta_energy]:
                     self.grid[site] = -self.grid[site]
-
 
         for sweep in range(self.sweeps):
             pbar.update(sweep)
@@ -150,11 +111,9 @@ class Ising(object):
 
         self.handler.append(self.grid, self.h5path+'finalstate')
 
-
     def evolve_wolff(self, pbar):
-        """
-        Ewolve it using Wolff's algorithm.
-        """
+        """ Ewolve it using Wolff's algorithm. """
+
         g = self.grid
 
         bond_probability = 1 - np.exp(-2/self.temperature)
@@ -206,52 +165,6 @@ class Ising(object):
 
         self.handler.append(self.grid, self.h5path+'finalstate')
 
-    def print_sim_parameters(self):
-
-        sweeps = self.sweeps
-        width = self.shape[0]
-        height = self.shape[1]
-        lattice_size = width * height
-        saveinterval_in_iterations = lattice_size * self.saveinterval
-
-        total_iters = sweeps * lattice_size
-
-        try:
-            depth = self.shape[2]
-            lattice_size = width * height * depth
-            total_iters = sweeps * lattice_size
-        except (IndexError, NameError):
-            pass
-
-        if self.mode == 'metropolis':
-            simparams = """
-            h5path             : {}
-            Algorithm          : {}
-            Lattice Shape      : {}
-            Lattice Size       : {}
-            Temperature        : {}
-            Sweeps to perform  : {} (1 sweep = {} iterations)
-            Total Iterations   : {} ({} * {} * {})
-            Saving state every : {} sweeps (every {} iterations)
-            """.format(self.h5path, self.mode, self.shape, lattice_size,
-                       self.temperature,
-                       sweeps, lattice_size, total_iters, sweeps, width, height,
-                       self.saveinterval, saveinterval_in_iterations)
-
-        elif self.mode == 'wolff':
-            simparams = """
-            h5path             : {}
-            Algorithm          : {}
-            Lattice Shape      : {}
-            Lattice Size       : {}
-            Temperature        : {}
-            Cluster flips      : {}
-            Saving state every : {} cluster flips
-            """.format(self.h5path, self.mode, self.shape, lattice_size,
-                       self.temperature, sweeps, self.saveinterval)
-        print(simparams)
-        #TODO
-        #3D version
 
 class IsingAnim(Ising):
     def evolve_metropolis(self, sleep=0):

@@ -62,7 +62,7 @@ def acf(ndarr, length=None):
     return result
 
 
-def make_energy_map():
+def make_energy_map_2D():
     """
     This functions returns this dictionary:
     {(False, (False, False)): 2,
@@ -95,7 +95,53 @@ def make_energy_map():
 
     return energy_map
 
-def make_delta_energy_map():
+def make_energy_map_3D():
+    """
+    This functions returns this dictionary:
+    {(False, (False, False, False)): 3,
+     (False, (False, False, True)): 1,
+     (False, (False, True, False)): 1,
+     (False, (True, False, False)): 1,
+     (False, (True, True, Flase)): -1,
+     (False, (True, False, True)): -1,
+     (False, (False, True, True)): -1,
+     (False, (True, True, True)): -3,
+     (True, (False, False, False)): -3,
+     (True, (False, False, True)): -1,
+     (True, (False, True, False)): -1,
+     (True, (True, False, False)): -1,
+     (True, (True, True, Flase)): 1,
+     (True, (True, False, True)): 1,
+     (True, (False, True, True)): 1,
+     (True, (True, True, True)): 3,
+    """
+    energy_map = dict()
+
+    #possible below, right and front neighbors
+    config1 = (True, True, True)
+    config2 = (True, True, False)
+    config3 = (True, False, False)
+    config4 = (False, False, False)
+
+    for perm in set(permutations(config1)):
+        energy_map.update({(True,perm):3})
+        energy_map.update({(False,perm):-3})
+
+    for perm in set(permutations(config2)):
+        energy_map.update({(True,perm):1})
+        energy_map.update({(False,perm):-1})
+
+    for perm in set(permutations(config3)):
+        energy_map.update({(True,perm):-1})
+        energy_map.update({(False,perm):1})
+
+    for perm in set(permutations(config4)):
+        energy_map.update({(True,perm):-3})
+        energy_map.update({(False,perm):3})
+
+    return energy_map
+
+def make_delta_energy_map_2D():
     """
     {(False, (False, False, False, False)): 8,
      (False, (False, False, False, True)): 4,
@@ -163,22 +209,72 @@ def make_delta_energy_map():
 
     return delta_energy_map
 
-def probability_table(dimension, temperature):
-    """ Returns a dictionary representing a probability table. """
+def make_delta_energy_map_3D():
+    """ A straightforward addition to the 2D varaiant """
+    dE_map = dict()
+
+    #possible neighbors
+    config1 = (True, True, True, True, True, True)
+    config2 = (True, True, True, True, True, False)
+    config3 = (True, True, True, True, False, False)
+    config4 = (True, True, True, False, False, False)
+    config5 = (True, True, False, False, False, False)
+    config6 = (True, False, False, False, False, False)
+    config7 = (False, False, False, False, False, False)
+
+    #CHECK THESE!
+    for perm in set(permutations(config1)):
+        dE_map.update({(True,perm):12})
+        dE_map.update({(False,perm):-12})
+
+    for perm in set(permutations(config2)):
+        dE_map.update({(True,perm):8})
+        dE_map.update({(False,perm):-8})
+
+    for perm in set(permutations(config3)):
+        dE_map.update({(True,perm):4})
+        dE_map.update({(False,perm):-4})
+
+    for perm in set(permutations(config4)):
+        dE_map.update({(True,perm) :0})
+        dE_map.update({(False,perm) :0})
+
+    for perm in set(permutations(config5)):
+        dE_map.update({(True,perm):-4})
+        dE_map.update({(False,perm):4})
+
+    for perm in set(permutations(config6)):
+        dE_map.update({(True,perm):-8})
+        dE_map.update({(False,perm):8})
+
+    for perm in set(permutations(config7)):
+        dE_map.update({(True,perm):-12})
+        dE_map.update({(False,perm):12})
+
+    return dE_map
+
+def probability_table(shape, temperature):
+    """
+    Returns a dictionary representing a probability table.
+    shape : tuple
+    temperature : float
+    """
+    dimension = len(shape)
+
     if dimension == 2:
         delta_energies = [-8, -4, 0, 4, 8]
     elif dimension == 3:
         delta_energies = [-12, -8, -4, 0, 4, 8, 12]
     else:
-        message = "No probability table for lattice dimension "
-        raise ValueError(message + "{}".format(dimension))
+        message = "No probability table for lattice shape: "
+        raise ValueError(message + "{}".format(shape))
 
     ptable = dict()
     for energy in delta_energies:
         ptable.update({energy:np.exp(-energy/temperature)})
     return ptable
 
-def neighbor_table(width, height=None, only_below_right=False):
+def neighbor_table(shape):
     """
     Returns a dictionary where the keys are the sites and the values
     are the neighbors. So for a 4x4 lattice we have:
@@ -201,19 +297,26 @@ def neighbor_table(width, height=None, only_below_right=False):
          15: (0, 14, 3, 11)}
 
     """
+    dimension = len(shape)
+    size = product(shape)
+    L = shape[0]
+
     nbr_table_helical = dict()
 
-    if only_below_right:
-        for site in range(width**2):
-            nbr_table_helical.update({site:nn_helical_bc_2d(site, width, only_below_right=True)})
+    if dimension == 2:
+        nn_function = nn_helical_bc_2D
+    elif dimension == 3:
+        nn_function = nn_helical_bc_3D
     else:
-        for site in range(width**2):
-            nbr_table_helical.update({site:nn_helical_bc_2d(site, width)})
+        raise Exception("Unsupported dimension: {}".format(dimension))
+
+    for site in range(size):
+        nbr_table_helical.update({site:nn_function(site, L)})
 
     return nbr_table_helical
 
 
-def nn_helical_bc_2d(site, width, height=None, only_below_right=False):
+def nn_helical_bc_2D(site, width):
     """
     site: int
     width: int
@@ -260,14 +363,135 @@ def nn_helical_bc_2d(site, width, height=None, only_below_right=False):
     -------------
 
     """
-    if only_below_right:
-        below = (site+1) % width**2
-        right = (site+width) % width**2
-        return below, right
+    below = (site+1) % width**2
+    above = (site-1) % width**2
+    right = (site+width) % width**2
+    left = (site-width) % width**2
+    return below, above, right, left
+
+def nn_helical_bc_3D(site, L):
+    """
+    Same idea as the 2D variant, just now it's some kind of hyperdougnut.
+    """
+    i = (site+1) % L**3
+    j = (site-1) % L**3
+    k = (site+L) % L**3
+    l = (site-L) % L**3
+    m = (site+L**2) % L**3
+    n = (site-L**2) % L**3
+    return i,j,k,l,m,n
+
+def get_delta_energy_function(ising):
+    dimension = len(ising.shape)
+    g = ising.grid
+
+    if dimension == 2:
+        nbr_table = neighbor_table(ising.shape)
+        delta_energy_map = make_delta_energy_map_2D()
+
+        def delta_energy(site):
+            below, above, right, left = nbr_table[site]
+            key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]),
+                                   bool(g[left])))
+            delta_energy = delta_energy_map[key]
+            return delta_energy
+
+    elif dimension == 3:
+        nbr_table = neighbor_table(ising.shape)
+        delta_energy_map = make_delta_energy_map_3D()
+
+        def delta_energy(site):
+            below, above, right, left, front, back = nbr_table[site]
+            key = (bool(g[site]), (bool(g[below]), bool(g[above]), bool(g[right]),
+                   bool(g[left]), bool(g[front]), bool(g[back])) )
+            delta_energy = delta_energy_map[key]
+            return delta_energy
 
     else:
-        below = (site+1) % width**2
-        above = (site-1) % width**2
-        right = (site+width) % width**2
-        left = (site-width) % width**2
-        return below, above, right, left
+        raise Exception("Unsupported dimension: {}".format(dimension))
+
+    return delta_energy
+
+
+def get_calc_energy_function(ising):
+    dimension = len(ising.shape)
+    g = ising.grid
+    size = product(ising.shape)
+
+    if dimension == 2:
+        nbr_table = neighbor_table(ising.shape)
+        energy_map = make_energy_map_2D()
+
+        def calc_energy():
+            """ Returns the total energy """
+            energy = 0
+            for site in range(size):
+                below, above, right, left = nbr_table[site]
+                key = (bool(g[site]), (bool(g[right]), bool(g[below])))
+                energy = energy + energy_map[key]
+            return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
+
+    elif dimension == 3:
+        nbr_table = neighbor_table(ising.shape)
+        energy_map = make_energy_map_3D()
+
+        def calc_energy():
+            """ Returns the total energy """
+            energy = 0
+            for site in range(size):
+                below, above, right, left, front, back = nbr_table[site]
+                key = (bool(g[site]),
+                       (bool(g[right]), bool(g[below]), bool(g[front])))
+                energy = energy + energy_map[key]
+            return -energy  # H = -J*SUM(nearest neighbors) Let op de -J.
+    else:
+        raise Exception("Unsupported dimension: {}".format(dimension))
+
+    return calc_energy
+
+def print_sim_parameters(ising):
+
+    sweeps = ising.sweeps
+    width = ising.shape[0]
+    height = ising.shape[1]
+    lattice_size = width * height
+    saveinterval_in_iterations = lattice_size * ising.saveinterval
+
+    total_iters = sweeps * lattice_size
+
+    try:
+        depth = ising.shape[2]
+        lattice_size = width * height * depth
+        total_iters = sweeps * lattice_size
+    except (IndexError, NameError):
+        pass
+
+    if ising.mode == 'metropolis':
+        simparams = """
+        h5path             : {}
+        Algorithm          : {}
+        Lattice Shape      : {}
+        Lattice Size       : {}
+        Temperature        : {}
+        Sweeps to perform  : {} (1 sweep = {} iterations)
+        Total Iterations   : {} ({} * {} * {})
+        Saving state every : {} sweeps (every {} iterations)
+        """.format(ising.h5path, ising.mode, ising.shape, lattice_size,
+                   ising.temperature,
+                   sweeps, lattice_size, total_iters, sweeps, width, height,
+                   ising.saveinterval, saveinterval_in_iterations)
+
+    elif ising.mode == 'wolff':
+        simparams = """
+        h5path             : {}
+        Algorithm          : {}
+        Lattice Shape      : {}
+        Lattice Size       : {}
+        Temperature        : {}
+        Cluster flips      : {}
+        Saving state every : {} cluster flips
+        """.format(ising.h5path, ising.mode, ising.shape, lattice_size,
+                   ising.temperature, sweeps, ising.saveinterval)
+    print(simparams)
+    #TODO
+    #3D version
