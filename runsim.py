@@ -7,7 +7,7 @@ import argparse
 import numpy
 from ising import Ising
 
-import ext.progressbar as pb
+from ext import progressbar as pb
 from misc import drawwidget
 from ext.hdf5handler import HDF5Handler
 
