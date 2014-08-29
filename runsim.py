@@ -7,7 +7,8 @@ import argparse
 import numpy
 from ising import Ising
 
-import ext.progressbar as pb
+from ext import progressbar as pb
+from misc import drawwidget
 from ext.hdf5handler import HDF5Handler
 
 
@@ -56,24 +57,13 @@ def simulate():
             if args.verbose:
                 i.print_sim_parameters()
 
-            pbar = pb.ProgressBar(widgets=drawwidget("  T = {}  {}/{} ".format(round(T,4), index+1, len(temperatures))),
-                              maxval=args.sweeps).start()
-
-
+            widgets=drawwidget("  T = {}  {}/{} ".format(round(T,4), index+1,
+                                                         len(temperatures)))
+            pbar = pb.ProgressBar(widgets=widgets, maxval=args.sweeps).start()
             i.evolve(pbar)
-
             pbar.finish()
 
             handler.file.flush()
-
-
-def drawwidget(discription):
-    """ Formats the progressbar. """
-    widgets = [discription.ljust(20), pb.Percentage(), ' ',
-               pb.Bar(marker='#',left='[',right=']'),
-               ' ', pb.ETA()]
-    return widgets
-
 
 
 def get_arguments():
