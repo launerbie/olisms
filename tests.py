@@ -5,12 +5,12 @@ import unittest
 import ising
 from ext.colored import ColoredTextTestRunner
 
-from ext.hdf5handler.run_tests import test_file_group_dataset_creation
-from ext.hdf5handler.run_tests import test_python_scalars
-from ext.hdf5handler.run_tests import test_python_lists
-from ext.hdf5handler.run_tests import test_python_tuples
-from ext.hdf5handler.run_tests import test_ndarrays
-from ext.hdf5handler.run_tests import test_prefix
+from ext.hdf5handler.tests import test_file_group_dataset_creation
+from ext.hdf5handler.tests import test_python_scalars
+from ext.hdf5handler.tests import test_python_lists
+from ext.hdf5handler.tests import test_python_tuples
+from ext.hdf5handler.tests import test_ndarrays
+from ext.hdf5handler.tests import test_prefix
 
 
 class test_TotalEnergy_2D(unittest.TestCase):
