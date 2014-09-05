@@ -55,14 +55,14 @@ def get_arguments():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-a', '--algorithm', choices=['metropolis','wolff'],
-                        default='metropolis')
+                        default='wolff')
     parser.add_argument('-i', '--iterations', default=1000000, type=int,
                         help="Number of iterations, default: 100000")
     parser.add_argument('--shape', default=[200, 200], type=int,
                         nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
     parser.add_argument('--nointerpolate', action='store_true')
-    parser.add_argument('-T', default=1.5, type=float)
+    parser.add_argument('-T', default=2.3, type=float)
     parser.add_argument('--s1', default=0.1, type=float, help="image redraw interval")
     parser.add_argument('--s2', default=0.000001, type=float)
 

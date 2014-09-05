@@ -2,16 +2,8 @@
 import argparse
 import numpy
 import unittest
-import ising
-from ext.colored import ColoredTextTestRunner
 
-from ext.hdf5handler.run_tests import test_file_group_dataset_creation
-from ext.hdf5handler.run_tests import test_python_scalars
-from ext.hdf5handler.run_tests import test_python_lists
-from ext.hdf5handler.run_tests import test_python_tuples
-from ext.hdf5handler.run_tests import test_ndarrays
-from ext.hdf5handler.run_tests import test_prefix
-
+from .. import ising
 
 class test_TotalEnergy_2D(unittest.TestCase):
     def setUp(self):
@@ -515,47 +507,5 @@ class test_magnetization(unittest.TestCase):
     def test_magnetization(self):
         I = self.ising
         self.assertEqual(I.magnetization, 3)
-
-#if __name__ == '__main__':
-#    unittest.main(verbosity=2, testRunner=ColoredTextTestRunner)
-
-
-def get_arguments():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-v','--verbosity', type=int, default=2)
-    args = parser.parse_args()
-    return args
-
-if __name__ == "__main__":
-    args = get_arguments()
-
-    test_cases = [\
-                  test_TotalEnergy_2D,
-                  test_TotalEnergy_3D,
-                  test_delta_energy_2D,
-                  test_delta_energy_3D,
-                  test_magnetization,
-                  # TODO: import HDF5 stuff as a suite
-                  test_file_group_dataset_creation,
-                  test_python_scalars,
-                  test_python_lists,
-                  test_ndarrays,
-                  test_prefix,
-                 ]
-
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-
-    for tc in test_cases:
-        tests = loader.loadTestsFromTestCase(tc)
-        suite.addTests(tests)
-
-    runner = ColoredTextTestRunner(verbosity=args.verbosity)
-    results = runner.run(suite)
-
-    if (len(results.failures) or len(results.errors)) > 0:
-        exit(1)
-    else:
-        exit(0)
 
 

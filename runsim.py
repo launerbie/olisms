@@ -72,14 +72,14 @@ def get_arguments():
     parser.add_argument('-f', '--filename', help="hdf5 output file name", required=True)
     parser.add_argument('-a', '--algorithm',
                         choices=['metropolis','wolff'],
-                        default='metropolis')
-    parser.add_argument('-s', '--sweeps', default=20000, type=int,
+                        default='wolff')
+    parser.add_argument('-s', '--sweeps', default=200, type=int,
                         help="Number of sweeps, default: 20000")
     parser.add_argument('--shape', default=[20, 20], type=int,
                         nargs='+', help="Lattice size")
     parser.add_argument('--aligned', action='store_true')
-    parser.add_argument('--tmin', default=1.5, type=float)
-    parser.add_argument('--tmax', default=3.5, type=float)
+    parser.add_argument('--tmin', default=2.2, type=float)
+    parser.add_argument('--tmax', default=2.5, type=float)
     parser.add_argument('--steps', default=10, type=float)
     parser.add_argument('--saveinterval', default=50, type=int)
     parser.add_argument('--skip', default=0, type=int)
