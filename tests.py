@@ -2,16 +2,11 @@
 import argparse
 import numpy
 import unittest
+
 import ising
 from ext.colored import ColoredTextTestRunner
 
-from ext.hdf5handler.tests import test_file_group_dataset_creation
-from ext.hdf5handler.tests import test_python_scalars
-from ext.hdf5handler.tests import test_python_lists
-from ext.hdf5handler.tests import test_python_tuples
-from ext.hdf5handler.tests import test_ndarrays
-from ext.hdf5handler.tests import test_prefix
-
+from ext.hdf5handler.tests import tests as hdf5handlertests
 
 class test_TotalEnergy_2D(unittest.TestCase):
     def setUp(self):
@@ -516,9 +511,6 @@ class test_magnetization(unittest.TestCase):
         I = self.ising
         self.assertEqual(I.magnetization, 3)
 
-#if __name__ == '__main__':
-#    unittest.main(verbosity=2, testRunner=ColoredTextTestRunner)
-
 
 def get_arguments():
     parser = argparse.ArgumentParser()
@@ -529,18 +521,13 @@ def get_arguments():
 if __name__ == "__main__":
     args = get_arguments()
 
+    #cases defined here
     test_cases = [\
                   test_TotalEnergy_2D,
                   test_TotalEnergy_3D,
                   test_delta_energy_2D,
                   test_delta_energy_3D,
                   test_magnetization,
-                  # TODO: import HDF5 stuff as a suite
-                  test_file_group_dataset_creation,
-                  test_python_scalars,
-                  test_python_lists,
-                  test_ndarrays,
-                  test_prefix,
                  ]
 
     loader = unittest.TestLoader()
@@ -549,6 +536,9 @@ if __name__ == "__main__":
     for tc in test_cases:
         tests = loader.loadTestsFromTestCase(tc)
         suite.addTests(tests)
+
+    #add cases from hdf5handler.tests.tests
+    suite.addTests(loader.loadTestsFromModule(hdf5handlertests))
 
     runner = ColoredTextTestRunner(verbosity=args.verbosity)
     results = runner.run(suite)
