@@ -9,7 +9,7 @@ from ising import Ising
 
 from ext import progressbar as pb
 from misc import drawwidget
-from ext.hdf5handler.hdf5handler import HDF5Handler
+from ext.hdf5handler import HDF5Handler
 
 
 def main():
