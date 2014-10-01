@@ -468,7 +468,6 @@ def print_sim_parameters(ising):
 
     if ising.mode == 'metropolis':
         simparams = """
-        h5path             : {}
         Algorithm          : {}
         Lattice Shape      : {}
         Lattice Size       : {}
@@ -476,21 +475,20 @@ def print_sim_parameters(ising):
         Sweeps to perform  : {} (1 sweep = {} iterations)
         Total Iterations   : {} ({} * {} * {})
         Saving state every : {} sweeps (every {} iterations)
-        """.format(ising.h5path, ising.mode, ising.shape, lattice_size,
+        """.format(ising.mode, ising.shape, lattice_size,
                    ising.temperature,
                    sweeps, lattice_size, total_iters, sweeps, width, height,
                    ising.saveinterval, saveinterval_in_iterations)
 
     elif ising.mode == 'wolff':
         simparams = """
-        h5path             : {}
         Algorithm          : {}
         Lattice Shape      : {}
         Lattice Size       : {}
         Temperature        : {}
         Cluster flips      : {}
         Saving state every : {} cluster flips
-        """.format(ising.h5path, ising.mode, ising.shape, lattice_size,
+        """.format(ising.mode, ising.shape, lattice_size,
                    ising.temperature, sweeps, ising.saveinterval)
     print(simparams)
     #TODO

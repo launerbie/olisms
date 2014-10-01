@@ -49,9 +49,10 @@ def simulate():
             h5path = "/"+"sim_"+str(index).zfill(4)+"/"
             # h5path thus looks like:
             # "/sim_0000/", "/sim_0001/", etc.
+            handler.prefix = h5path
 
             i = Ising(args.shape, args.sweeps, temperature=T, handler=handler,
-                      h5path=h5path, aligned=args.aligned, mode=args.algorithm,
+                      aligned=args.aligned, mode=args.algorithm,
                       saveinterval=args.saveinterval, skip_n_steps=args.skip)
 
             if args.verbose:

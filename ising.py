@@ -12,7 +12,7 @@ from misc import print_sim_parameters as printer
 class Ising(object):
     """ Missing docstring """
     def __init__(self, shape, sweeps, temperature=10, aligned=False,
-                 mode='metropolis', handler=None, h5path=None,
+                 mode='metropolis', handler=None,
                  saveinterval=1, skip_n_steps=0):
         """
         Parameters
@@ -23,26 +23,18 @@ class Ising(object):
         aligned: create grid with all spins in the same direction
         mode : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
-        h5path: unix-style path, used as address in the hdf5 file
         saveinterval: interval (in sweeps) at which data is saved to hdf5
         """
         self.mode = mode
-
-        if mode == 'metropolis':
-            self.evolve = self.evolve_metropolis
-        elif mode == 'wolff':
-            self.evolve = self.evolve_wolff
-        else:
-            raise ValueError("Unknown mode")
-
         self.shape = tuple(shape)
+        self.lattice_size = product(self.shape)
         self.temperature = temperature
-        self.handler = handler
-        self.h5path = h5path
+
         self.sweeps = sweeps
         self.saveinterval = saveinterval
         self.skip_n_steps = skip_n_steps
-        self.lattice_size = product(self.shape)
+
+        self.handler = handler
 
         if aligned:
             self.grid = np.ones(self.lattice_size, dtype=bool)
@@ -56,14 +48,15 @@ class Ising(object):
         self.calc_energy = get_calc_energy_function(self)
 
         # save simulation parameters here
-        if self.handler and self.h5path:
+        if self.handler:
             self.writehdf5 = True
-            self.handler.put(np.array(self.shape), self.h5path+'shape')
-            self.handler.put(self.temperature, self.h5path+'temperature')
-            self.handler.put(self.lattice_size, self.h5path+'lattice_size')
-            self.handler.put(self.saveinterval, self.h5path+'saveinterval')
-            self.handler.put(np.array(self.grid, dtype='int8'),
-                                self.h5path+'initgrid', dtype='int8')
+            self.handler.put(np.array(self.shape), 'shape')
+            self.handler.put(self.temperature, 'temperature')
+            self.handler.put(self.lattice_size, 'lattice_size')
+            self.handler.put(self.saveinterval, 'saveinterval')
+            self.handler.put(np.array(self.grid, dtype='int8'), 'initgrid',
+                             dtype='int8')
+
 
             commit = subprocess.check_output(["git", "rev-parse", "HEAD"])
 
@@ -95,7 +88,13 @@ class Ising(object):
         self.delta_energy = get_delta_energy_function(self)
         self.calc_energy = get_calc_energy_function(self)
 
-
+    def evolve(self, pbar):
+        if self.mode == 'metropolis':
+            self.evolve_metropolis(pbar)
+        elif self.mode == 'wolff':
+            self.evolve_wolff(pbar)
+        else:
+            raise ValueError("Unknown mode")
 
     def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
         """ Evolve it using Metropolis. """
@@ -115,14 +114,11 @@ class Ising(object):
 
             if sweep % self.saveinterval == 0 and sweep >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.put(sweep, self.h5path+'sweep',
-                                        dtype='int16')
-                    self.handler.put(self.calc_energy(),
-                                        self.h5path+'energy')
-                    self.handler.put(self.magnetization,
-                                        self.h5path+'magnetization')
+                    self.handler.put(sweep, 'sweep', dtype='int16')
+                    self.handler.put(self.calc_energy(), 'energy')
+                    self.handler.put(self.magnetization, 'magnetization')
 
-        self.handler.put(self.grid, self.h5path+'finalstate')
+        self.handler.put(self.grid, 'finalstate')
 
     def evolve_wolff(self, pbar):
         """ Ewolve it using Wolff's algorithm. """
@@ -168,15 +164,11 @@ class Ising(object):
 
             if flip % self.saveinterval == 0 and flip >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.put(flip, self.h5path+'clusterflip',
-                                        dtype='int16')
-                    self.handler.put(self.calc_energy(),
-                                        self.h5path+'energy')
-                    self.handler.put(self.magnetization,
-                                        self.h5path+'magnetization')
+                    self.handler.put(flip, 'clusterflip', dtype='int16')
+                    self.handler.put(self.calc_energy(), 'energy')
+                    self.handler.put(self.magnetization, 'magnetization')
 
-
-        self.handler.put(self.grid, self.h5path+'finalstate')
+        self.handler.put(self.grid, 'finalstate')
 
 
 class IsingAnim(Ising):
