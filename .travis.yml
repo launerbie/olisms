@@ -6,7 +6,7 @@ python:
     - "3.4"
 
 # Handle git submodules yourself
- git:
+git:
      submodules: false
 # Use sed to replace the SSH URL with the public URL, then initialize submodules
 
