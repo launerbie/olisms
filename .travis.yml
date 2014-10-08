@@ -8,11 +8,12 @@ python:
 # Handle git submodules yourself
 git:
      submodules: false
-# Use sed to replace the SSH URL with the public URL, then initialize submodules
 
 before_install:
 #    - sudo apt-get update
-#     - apt-get install libhdf5-serial-dev #hdf5-tools
+     - apt-get install libhdf5-serial-dev #hdf5-tools
+
+# Use sed to replace the SSH URL with the public URL, then initialize submodules
      - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
      - git submodule update --init --recursive
 
