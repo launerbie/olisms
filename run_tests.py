@@ -25,7 +25,7 @@ if __name__ == "__main__" and __package__ is None:
 
     from olisms.ext.colored import ColoredTextTestRunner
     from olisms.tests import tests as isingstests
-    from olisms.ext.hdf5handler.tests import tests as hdf5handlertests
+#    from olisms.ext.hdf5handler.tests import tests as hdf5handlertests
 
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
