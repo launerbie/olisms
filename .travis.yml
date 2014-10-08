@@ -13,14 +13,14 @@ git:
 before_install:
 #    - sudo apt-get update
 #     - apt-get install libhdf5-serial-dev #hdf5-tools
-     - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-     - git submodule update --init --recursive
+#     - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+#     - git submodule update --init --recursive
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
 #    - pip install cython  #not a h5py dependency
     - pip install numpy
-    - pip install h5py
+#    - pip install h5py
 
 #before_script:
 #    - chmod +x do_nothing.sh
