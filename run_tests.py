@@ -30,7 +30,7 @@ if __name__ == "__main__" and __package__ is None:
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
     suite.addTests(loader.loadTestsFromModule(isingstests))
-    suite.addTests(loader.loadTestsFromModule(hdf5handlertests))
+#    suite.addTests(loader.loadTestsFromModule(hdf5handlertests))
 
     runner = ColoredTextTestRunner(verbosity=ARGS.verbosity)
     results = runner.run(suite)
