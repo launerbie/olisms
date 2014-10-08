@@ -11,7 +11,7 @@ git:
 
 before_install:
 #    - sudo apt-get update
-     - apt-get install libhdf5-serial-dev #hdf5-tools
+#     - apt-get install libhdf5-serial-dev #hdf5-tools
 
 # Use sed to replace the SSH URL with the public URL, then initialize submodules
      - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
@@ -19,9 +19,9 @@ before_install:
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
-    - pip install cython
+#    - pip install cython
     - pip install numpy
-    - pip install h5py
+#    - pip install h5py
 
 #before_script:
 #    - chmod +x do_nothing.sh
