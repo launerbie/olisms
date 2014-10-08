@@ -6,8 +6,8 @@ python:
     - "3.4"
 
 before_install:
-    - sudo apt-get update
-    - sudo apt-get install libhdf5-serial-dev #hdf5-tools
+#    - sudo apt-get update
+#    - sudo apt-get install libhdf5-serial-dev #hdf5-tools
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
