@@ -111,7 +111,7 @@ class Simulation(object):
             self.shape = kwargs['shape']
             self.mcs = kwargs['mcs']
 
-            self.handler =  kwargs['handler'] #what to do here?
+#            self.handler =  kwargs['handler'] #what to do here?
             self.filename =  kwargs['filename']
             self.h5path = kwargs['h5path']
         except KeyError as e:
@@ -126,10 +126,12 @@ class Simulation(object):
         return "T:{} shape:{} h5path:{}".format(*subs)
 
 class FakeIsing(object):
-    """ To be replaced by olisms.ising.Ising"""
-    def __init__(self, simulation):
+    """ To be replaced by olisms.ising.Ising """
+
+    def __init__(self, simulation, handler):
         assert isinstance(simulation, Simulation)
         self.params = simulation
+        self.handler = handler
 
     def start(self, pbar):
         """ Start simulation, but for now let's just calculate some
@@ -140,7 +142,9 @@ class FakeIsing(object):
 
         for i in range(self.params.mcs):
             pbar.update(i)
-            hash_ = h.hexdigest()
+            for j in range(200):
+                hash_ = h.hexdigest()
+                self.handler.put(hash_, "hash")
         return hash_
 
 class Writer(object):
@@ -215,23 +219,60 @@ class Pbar(object):
         self.pbar.finish()
         return False
 
-
 class FileStates(object):
     """ Keeps track of hdf5 files that are open."""
-    def __init__(self):
-        pass
 
+    def __init__(self, task):
+        self.openfiles = {}
+
+    def register_task(self, task):
+
+        #filename = task['hdf5filename']
+        filename = task.filename
+
+        if filename in self.openfiles:
+            hdf5handler = self.openfiles[filename]['handler']
+
+        else:
+            hdf5handler = HDF5Handler.open(filename)
+            total = task['total_tasks']
+            self.openfiles.update({filename:{'handler':hdf5handler,\
+                                             'countdown':total}})
+
+        return hdf5handler
+
+    def completed_job(self, task):
+        #Bepaal of de voltooide taak de 'hekkensluiter' is.
+        #Zo ja, sluit bestand. Zo nee, doe niks.
+
+        #filename = task['hdf5filename']
+        filename = task.filename
+
+        self.openfiles[filename]['countdown'] -= 1
+
+        if self.openfiles[filename]['countdown'] == 0:
+            handler = self.openfiles[filename]['handler']
+            handler.close()
+    
+            self.openfiles.pop(filename)
 
 def worker(tasks_queue, done_queue, filestates):
+    """ 
+    - pull task from tasks_queue
+    - register task at FileStates, which will give you a handler.
+    - pass handler to FakeIsing and call .start()
+    - register task completion at FileStates
     """
-    This one calls Ising.evolve/Ising.start.
-    """
+
     for sim in iter(tasks_queue.get, 'STOP'):
         process_id = int((mp.current_process().name)[-1]) #find nicer way
         writer = Writer((0, process_id), TERM)
 
+        handler = filestates.register_task() #TODO
+        
+
         with Pbar(sim, writer) as bar:
-            isingsim = FakeIsing(sim)
+            isingsim = FakeIsing(sim, handler)
             isingsim.start(pbar=bar)
 
         timestamp = time.strftime("%c")
@@ -239,7 +280,6 @@ def worker(tasks_queue, done_queue, filestates):
         job_report = "T={} time:{}".format(sim.temperature, timestamp)
         logging.info(job_report)
         done_queue.put(job_report)
-
 
 def main():
     """
