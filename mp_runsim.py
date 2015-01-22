@@ -52,12 +52,12 @@ def parsecfg(configfile):
                     "mcs":         int(cfg[job]['mcs']),
                     "skip_n_steps":int(cfg[job]['skip_n_steps']),
                     "saveinterval":int(cfg[job]['saveinterval']),
+                    "temperature": T,
                     "filename":    os.path.normpath(cfg[job]['filename']),
                     "h5path":      "/"+"sim_"+str(index).zfill(4)+"/",
                     "job_total":   int(cfg[job]['steps']),
                    }
 
-            #logging.debug(job_args)
             tasks.append(task)
 
     logging.debug(tasks)
@@ -80,7 +80,7 @@ class FakeIsing(object):
         for i in range(self.task["mcs"]):
             pbar.update(i)
             hash_ = h.hexdigest()
-            self.handler.put(hash_, "hash")
+            self.handler.put(random.randint(1,10000), "mockdata")
         return hash_
 
 class FileStates(object):
@@ -89,7 +89,7 @@ class FileStates(object):
     def __init__(self):
         self.openfiles = {}
 
-    def register_task_start(self, task):
+    def register_task_start(self, task, process_id):
 
         filename = task['filename']
 
@@ -97,13 +97,15 @@ class FileStates(object):
             hdf5handler = self.openfiles[filename]['handler']
 
         else:
-            hdf5handler = HDF5Handler.open(filename)
+            hdf5handler = HDF5Handler(filename)
+            hdf5handler.open()
+            logging.debug("Process %i opened: %s"%(process_id,hdf5handler.filename))
             self.openfiles.update({filename:{'handler':hdf5handler,\
                                              'countdown':task['job_total']}})
 
         return hdf5handler
 
-    def register_task_done(self, task):
+    def register_task_done(self, task, process_id):
         #Bepaal of de voltooide taak de 'hekkensluiter' is.
         #Zo ja, sluit bestand. Zo nee, doe niks.
 
@@ -112,8 +114,9 @@ class FileStates(object):
         self.openfiles[filename]['countdown'] -= 1
 
         if self.openfiles[filename]['countdown'] == 0:
-            handler = self.openfiles[filename]['handler']
-            handler.close()
+            hdf5handler = self.openfiles[filename]['handler']
+            hdf5handler.close()
+            logging.debug("Process %i closed: %s"%(process_id,hdf5handler.filename))
     
             self.openfiles.pop(filename)
 
@@ -129,16 +132,20 @@ def worker(tasks_queue, done_queue, filestates):
         process_id = int((mp.current_process().name)[-1]) #find nicer way
         writer = Writer((0, process_id), TERM)
 
-        handler = filestates.register_task_start(task)
+        logging.debug("Process %i registering task start"%process_id)
+        handler = filestates.register_task_start(task, process_id)
 
         with Pbar(task, writer) as bar:
             isingsim = FakeIsing(task, handler)
             isingsim.start(pbar=bar)
 
-        filestates.register_task_done(task)
+        logging.debug("Process %i registering task done"%process_id)
+        filestates.register_task_done(task, process_id)
 
         timestamp = time.strftime("%c")
-        job_report = "T={} time:{}".format(task["temperature"], timestamp)
+        job_report = "T={} time:{} (process {})".format(task["temperature"],
+                                                        timestamp,
+                                                        process_id)
         logging.info(job_report)
         done_queue.put(job_report)
 
@@ -236,7 +243,7 @@ class CompletedJobsWriter(object):
 
 class Pbar(object):
     def __init__(self, task, writer):
-        self.description = task["temperature"]+" "
+        self.description = "T:"+str(task["temperature"])+" "
         self.pbar = ProgressBar(widgets=drawwidget(self.description),
                                 maxval=task["mcs"], fd=writer)
 
