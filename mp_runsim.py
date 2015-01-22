@@ -12,7 +12,9 @@ import hashlib
 import numpy
 from blessings import Terminal
 from ext.progressbar import ProgressBar
+from ext.hdf5handler import HDF5Handler
 from misc import drawwidget
+
 """
 In mp_runsim.py the simulations are set up by reading a configfile.
 The simulations are then processed by an x number of workers.
@@ -37,115 +39,142 @@ def parsecfg(configfile):
     logging.debug(cfg.sections())
     logging.debug(jobs)
 
-    sims = []
+    tasks = []
 
     for job in jobs:
-        job_args = dict(algorithm = cfg[job]['algorithm'],
-                        shape = tuple(cfg[job]['shape'].split('x')),
-                        mcs = int(cfg[job]['mcs']),
-                        saveinterval = cfg[job]['saveinterval'],
-                        skip_n_steps = cfg[job]['skip_n_steps'],
-                        minT = int(cfg[job]['mintemp']),
-                        maxT = int(cfg[job]['maxtemp']),
-                        steps = int(cfg[job]['steps']),
-                        filename = os.path.normpath(cfg[job]['filename']),
-                       )
+        for index, T in enumerate(numpy.linspace(int(cfg[job]['mintemp']),
+                                                 int(cfg[job]['maxtemp']),
+                                                 int(cfg[job]['steps']))):
+            task = {
+                    "algorithm":   str(cfg[job]['algorithm']),
+                    "shape":       tuple(cfg[job]['shape'].split('x')),
+                    "aligned":     bool(cfg[job]['aligned']),
+                    "mcs":         int(cfg[job]['mcs']),
+                    "skip_n_steps":int(cfg[job]['skip_n_steps']),
+                    "saveinterval":int(cfg[job]['saveinterval']),
+                    "filename":    os.path.normpath(cfg[job]['filename']),
+                    "h5path":      "/"+"sim_"+str(index).zfill(4)+"/",
+                    "job_total":   int(cfg[job]['steps']),
+                   }
 
-        #logging.debug(job_args)
-        sims.extend(split_job_into_sims(job_args))
+            #logging.debug(job_args)
+            tasks.append(task)
 
-    logging.debug(sims)
-    return sims
-
-def split_job_into_sims(job):
-    simulations = []
-    for index, T in enumerate(numpy.linspace(job['minT'],
-                                             job['maxT'],
-                                             job['steps'])):
-        h5path = "/"+"sim_"+str(index).zfill(4)+"/"
-        sim_kwargs = dict(shape=job['shape'],
-                          mcs=job['mcs'],
-                          temperature=T,
-                          saveinterval=job['saveinterval'],
-                          skip_n_steps=job['skip_n_steps'],
-                          filename=os.path.normpath(job['filename']),
-                          algorithm=job['algorithm'],
-                          h5path=h5path,
-                          handler="somehandler" #TODO;fix
-                         )
-        sim = Simulation(**sim_kwargs)
-        simulations.append(sim)
-    return simulations
-
-class Simulation(object):
-    """ Container for holding simulation parameters. """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Parameters
-        ----------
-        aligned : bool
-            Set an initial grid with all spins aligned.
-
-        temperature: float
-
-        mcs : int
-            Number of Monte-Carlo steps.
-            For Metropolis, 1 MCS = 1 sweep.
-            For Wolff, 1 MCS = 1 cluster flip (even though this is not
-            actually correct)
-
-        shape: tuple
-            Shape of the lattice.
-
-        algorithm: str
-            Either 'metropolis' or 'wolff'
-        """
-
-        self.label = kwargs.get('label', 'unknown')
-        self.aligned = kwargs.get('aligned', False)
-
-        try:
-            self.algorithm = kwargs['algorithm']
-            self.temperature = kwargs['temperature']
-            self.shape = kwargs['shape']
-            self.mcs = kwargs['mcs']
-
-#            self.handler =  kwargs['handler'] #what to do here?
-            self.filename =  kwargs['filename']
-            self.h5path = kwargs['h5path']
-        except KeyError as e:
-            print(e)
-            raise Exception
-
-    def __str__(self):
-        return str(self.temperature)
-
-    def __repr__(self):
-        subs = (self.temperature, self.shape, self.h5path)
-        return "T:{} shape:{} h5path:{}".format(*subs)
+    logging.debug(tasks)
+    return tasks
 
 class FakeIsing(object):
     """ To be replaced by olisms.ising.Ising """
 
-    def __init__(self, simulation, handler):
-        assert isinstance(simulation, Simulation)
-        self.params = simulation
+    def __init__(self, task, handler):
+        self.task = task
         self.handler = handler
 
     def start(self, pbar):
         """ Start simulation, but for now let's just calculate some
         hashes."""
-        string = str(self.params.label).encode('UTF-8')
+        string = "Hash me with SHA-256!".encode('UTF-8')
         h = hashlib.sha256()
         h.update(string)
 
-        for i in range(self.params.mcs):
+        for i in range(self.task["mcs"]):
             pbar.update(i)
-            for j in range(200):
-                hash_ = h.hexdigest()
-                self.handler.put(hash_, "hash")
+            hash_ = h.hexdigest()
+            self.handler.put(hash_, "hash")
         return hash_
+
+class FileStates(object):
+    """ Keeps track of hdf5 files that are open."""
+
+    def __init__(self):
+        self.openfiles = {}
+
+    def register_task_start(self, task):
+
+        filename = task['filename']
+
+        if filename in self.openfiles:
+            hdf5handler = self.openfiles[filename]['handler']
+
+        else:
+            hdf5handler = HDF5Handler.open(filename)
+            self.openfiles.update({filename:{'handler':hdf5handler,\
+                                             'countdown':task['job_total']}})
+
+        return hdf5handler
+
+    def register_task_done(self, task):
+        #Bepaal of de voltooide taak de 'hekkensluiter' is.
+        #Zo ja, sluit bestand. Zo nee, doe niks.
+
+        filename = task['filename']
+
+        self.openfiles[filename]['countdown'] -= 1
+
+        if self.openfiles[filename]['countdown'] == 0:
+            handler = self.openfiles[filename]['handler']
+            handler.close()
+    
+            self.openfiles.pop(filename)
+
+def worker(tasks_queue, done_queue, filestates):
+    """ 
+    - pull task from tasks_queue
+    - register task at FileStates, which will give you a handler.
+    - pass handler to FakeIsing and call .start()
+    - register task completion at FileStates
+    """
+
+    for task in iter(tasks_queue.get, 'STOP'):
+        process_id = int((mp.current_process().name)[-1]) #find nicer way
+        writer = Writer((0, process_id), TERM)
+
+        handler = filestates.register_task_start(task)
+
+        with Pbar(task, writer) as bar:
+            isingsim = FakeIsing(task, handler)
+            isingsim.start(pbar=bar)
+
+        filestates.register_task_done(task)
+
+        timestamp = time.strftime("%c")
+        job_report = "T={} time:{}".format(task["temperature"], timestamp)
+        logging.info(job_report)
+        done_queue.put(job_report)
+
+def main():
+    """
+    Missing docstring
+    """
+    tasks_queue = mp.Queue()
+    done_queue = mp.Queue()
+    filestates = FileStates()
+
+    processpool = []
+    for i in range(ARGS.nr_workers):
+        p = mp.Process(target=worker, args=(tasks_queue, done_queue, filestates)).start()
+        processpool.append(p)
+
+    tasks = parsecfg(ARGS.config)
+    for t in tasks:
+        tasks_queue.put(t)
+
+    jobswriter = CompletedJobsWriter(TERM, (5,7)) #TODO: unhardcode
+    for i in range(len(tasks)):
+        jobswriter.print_line(done_queue.get())
+
+    for i in range(ARGS.nr_workers):
+        tasks_queue.put('STOP')
+
+
+def get_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', required=True, help="Config file")
+    parser.add_argument('--logfile', default='log_foo', help="logfile")
+    parser.add_argument("--workers", dest='nr_workers', default=4,
+                        type=int, help="Number of workers")
+    args = parser.parse_args()
+    return args
 
 class Writer(object):
     """ Create an object with a write method that writes to a
@@ -206,10 +235,10 @@ class CompletedJobsWriter(object):
                 print(line)
 
 class Pbar(object):
-    def __init__(self, sim, writer):
-        self.description = str(sim.temperature) + " "
+    def __init__(self, task, writer):
+        self.description = task["temperature"]+" "
         self.pbar = ProgressBar(widgets=drawwidget(self.description),
-                                maxval=sim.mcs, fd=writer)
+                                maxval=task["mcs"], fd=writer)
 
     def __enter__(self):
         self.pbar.start()
@@ -219,101 +248,6 @@ class Pbar(object):
         self.pbar.finish()
         return False
 
-class FileStates(object):
-    """ Keeps track of hdf5 files that are open."""
-
-    def __init__(self, task):
-        self.openfiles = {}
-
-    def register_task(self, task):
-
-        #filename = task['hdf5filename']
-        filename = task.filename
-
-        if filename in self.openfiles:
-            hdf5handler = self.openfiles[filename]['handler']
-
-        else:
-            hdf5handler = HDF5Handler.open(filename)
-            total = task['total_tasks']
-            self.openfiles.update({filename:{'handler':hdf5handler,\
-                                             'countdown':total}})
-
-        return hdf5handler
-
-    def completed_job(self, task):
-        #Bepaal of de voltooide taak de 'hekkensluiter' is.
-        #Zo ja, sluit bestand. Zo nee, doe niks.
-
-        #filename = task['hdf5filename']
-        filename = task.filename
-
-        self.openfiles[filename]['countdown'] -= 1
-
-        if self.openfiles[filename]['countdown'] == 0:
-            handler = self.openfiles[filename]['handler']
-            handler.close()
-    
-            self.openfiles.pop(filename)
-
-def worker(tasks_queue, done_queue, filestates):
-    """ 
-    - pull task from tasks_queue
-    - register task at FileStates, which will give you a handler.
-    - pass handler to FakeIsing and call .start()
-    - register task completion at FileStates
-    """
-
-    for sim in iter(tasks_queue.get, 'STOP'):
-        process_id = int((mp.current_process().name)[-1]) #find nicer way
-        writer = Writer((0, process_id), TERM)
-
-        handler = filestates.register_task() #TODO
-        
-
-        with Pbar(sim, writer) as bar:
-            isingsim = FakeIsing(sim, handler)
-            isingsim.start(pbar=bar)
-
-        timestamp = time.strftime("%c")
-
-        job_report = "T={} time:{}".format(sim.temperature, timestamp)
-        logging.info(job_report)
-        done_queue.put(job_report)
-
-def main():
-    """
-    Missing docstring
-    """
-    tasks_queue = mp.Queue()
-    done_queue = mp.Queue()
-    filestates = FileStates()
-
-    processpool = []
-    for i in range(ARGS.nr_workers):
-        p = mp.Process(target=worker, args=(tasks_queue, done_queue, filestates)).start()
-        processpool.append(p)
-
-    sims = parsecfg(ARGS.config)
-    for sim in sims:
-        tasks_queue.put(sim)
-
-    jobswriter = CompletedJobsWriter(TERM, (5,7)) #TODO: unhardcode
-    for i in range(len(sims)):
-        jobswriter.print_line(done_queue.get())
-
-    for i in range(ARGS.nr_workers):
-        tasks_queue.put('STOP')
-
-
-def get_arguments():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', required=True, help="Config file")
-    parser.add_argument('--logfile', default='log_foo', help="logfile")
-    parser.add_argument("--workers", dest='nr_workers', default=4,
-                        type=int, help="Number of workers")
-    args = parser.parse_args()
-    return args
 
 if __name__ == "__main__":
 
