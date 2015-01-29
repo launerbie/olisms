@@ -172,6 +172,15 @@ class Ising(object):
 
 
 class IsingAnim(Ising):
+
+    def evolve(self, *args, **kwds):
+        if self.mode == 'metropolis':
+            self.evolve_metropolis(*args, **kwds)
+        elif self.mode == 'wolff':
+            self.evolve_wolff(*args, **kwds)
+        else:
+            raise ValueError("Unknown mode")
+
     def evolve_metropolis(self, sleep=0):
         self.sweepcount = 0
         def sweep():
