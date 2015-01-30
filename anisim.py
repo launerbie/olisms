@@ -7,7 +7,7 @@ import matplotlib as mpl
 mpl.rcParams['toolbar'] = 'None'
 import matplotlib.pyplot as plt
 
-from ising import IsingAnim as Ising
+from ising import IsingAnim
 
 import threading
 import time
@@ -21,9 +21,9 @@ def main():
 
 def animate_evolution():
     plt.ion()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    i = Ising(args.shape, args.iterations, temperature=args.T, aligned=args.aligned,
+    fig1 = plt.figure()
+    ax = fig1.add_subplot(111)
+    i = IsingAnim(args.shape, args.iterations, temperature=args.T, aligned=args.aligned,
               mode=args.algorithm)
 
     grid_2d = i.grid.reshape(args.shape[0], args.shape[1])
@@ -48,7 +48,7 @@ def animate_evolution():
         g = i.grid.reshape(args.shape[0], args.shape[1])
         im.set_array(g)
         ax.set_title(str(i.sweepcount))
-        plt.draw()
+        fig1.canvas.draw()
 
 
 def get_arguments():
