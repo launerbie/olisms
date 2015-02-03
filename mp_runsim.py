@@ -4,12 +4,11 @@ import sys
 import argparse
 import multiprocessing as mp
 import time
-import h5py
 import os
-import random
 import logging
 import hashlib
 import numpy
+from ising import Ising
 from blessings import Terminal
 from ext.progressbar import ProgressBar
 from ext.hdf5handler import HDF5Handler
@@ -47,7 +46,7 @@ def parsecfg(configfile):
                                                  int(cfg[job]['steps']))):
             task = {
                     "algorithm":   str(cfg[job]['algorithm']),
-                    "shape":       tuple(cfg[job]['shape'].split('x')),
+                    "shape":       tuple(int(i) for i in cfg[job]['shape'].split('x')),
                     "aligned":     bool(cfg[job]['aligned']),
                     "mcs":         int(cfg[job]['mcs']),
                     "skip_n_steps":int(cfg[job]['skip_n_steps']),
@@ -55,7 +54,7 @@ def parsecfg(configfile):
                     "temperature": T,
                     "filename":    os.path.normpath(cfg[job]['filename']),
                     "h5path":      "/"+"sim_"+str(index).zfill(4)+"/",
-                    "job_total":   int(cfg[job]['steps']),
+                    "steps":   int(cfg[job]['steps']),
                    }
 
             tasks.append(task)
@@ -63,84 +62,28 @@ def parsecfg(configfile):
     logging.debug(tasks)
     return tasks
 
-class FakeIsing(object):
-    """ To be replaced by olisms.ising.Ising """
-
-    def __init__(self, task, handler):
-        self.task = task
-        self.handler = handler
-
-    def start(self, pbar):
-        """ Start simulation, but for now let's just calculate some
-        hashes."""
-        string = "Hash me with SHA-256!".encode('UTF-8')
-        h = hashlib.sha256()
-        h.update(string)
-
-        for i in range(self.task["mcs"]):
-            pbar.update(i)
-            hash_ = h.hexdigest()
-            self.handler.put(random.randint(1,10000), "mockdata")
-        return hash_
-
-class FileStates(object):
-    """ Keeps track of hdf5 files that are open."""
-
-    def __init__(self):
-        self.openfiles = {}
-
-    def register_task_start(self, task, process_id):
-
-        filename = task['filename']
-
-        if filename in self.openfiles:
-            hdf5handler = self.openfiles[filename]['handler']
-
-        else:
-            hdf5handler = HDF5Handler(filename)
-            hdf5handler.open()
-            logging.debug("Process %i opened: %s"%(process_id,hdf5handler.filename))
-            self.openfiles.update({filename:{'handler':hdf5handler,\
-                                             'countdown':task['job_total']}})
-
-        return hdf5handler
-
-    def register_task_done(self, task, process_id):
-        #Bepaal of de voltooide taak de 'hekkensluiter' is.
-        #Zo ja, sluit bestand. Zo nee, doe niks.
-
-        filename = task['filename']
-
-        self.openfiles[filename]['countdown'] -= 1
-
-        if self.openfiles[filename]['countdown'] == 0:
-            hdf5handler = self.openfiles[filename]['handler']
-            hdf5handler.close()
-            logging.debug("Process %i closed: %s"%(process_id,hdf5handler.filename))
+def hash_it(a):
+    h = hashlib.sha256()
+    h.update(str(a).encode('UTF-8'))
+    hash_ = h.hexdigest()
+    return hash_
     
-            self.openfiles.pop(filename)
-
-def worker(tasks_queue, done_queue, filestates):
-    """ 
-    - pull task from tasks_queue
-    - register task at FileStates, which will give you a handler.
-    - pass handler to FakeIsing and call .start()
-    - register task completion at FileStates
-    """
+def worker(tasks_queue, done_queue):
 
     for task in iter(tasks_queue.get, 'STOP'):
         process_id = int((mp.current_process().name)[-1]) #find nicer way
         writer = Writer((0, process_id), TERM)
 
-        logging.debug("Process %i registering task start"%process_id)
-        handler = filestates.register_task_start(task, process_id)
-
+        
         with Pbar(task, writer) as bar:
-            isingsim = FakeIsing(task, handler)
-            isingsim.start(pbar=bar)
-
-        logging.debug("Process %i registering task done"%process_id)
-        filestates.register_task_done(task, process_id)
+            with HDF5Handler(filename='/tmp/ising_data/'+hash_it(task)+'.hdf5') as h:
+                isingsim = Ising(shape=task['shape'], sweeps=task['mcs'], 
+                                 temperature=task['temperature'], 
+                                 aligned=task['aligned'],
+                                 mode=task['algorithm'], handler=h,
+                                 saveinterval=task['saveinterval'],
+                                 skip_n_steps=task['skip_n_steps'])
+                isingsim.evolve(pbar=bar)
 
         timestamp = time.strftime("%c")
         job_report = "T={} time:{} (process {})".format(task["temperature"],
@@ -155,14 +98,18 @@ def main():
     """
     tasks_queue = mp.Queue()
     done_queue = mp.Queue()
-    filestates = FileStates()
 
     processpool = []
     for i in range(ARGS.nr_workers):
-        p = mp.Process(target=worker, args=(tasks_queue, done_queue, filestates)).start()
+        p = mp.Process(target=worker, args=(tasks_queue, done_queue)).start()
         processpool.append(p)
 
     tasks = parsecfg(ARGS.config)
+   
+    with open('task_hashes.txt', 'w') as f:
+        for t in tasks:
+            f.write(str(t)+" : "+hash_it(t)+'\n')
+
     for t in tasks:
         tasks_queue.put(t)
 
