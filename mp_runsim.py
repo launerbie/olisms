@@ -46,9 +46,7 @@ def worker(tasks_queue, done_queue):
                 isingsim.evolve(pbar=bar)
 
         timestamp = time.strftime("%c")
-        job_report = "T={0:.3f} time:{} ".format(task["temperature"],
-                                            timestamp,
-                                            process_id)
+        job_report = "T={} time:{}".format(task["temperature"],timestamp)
         logging.info(job_report)
         done_queue.put(job_report)
 
