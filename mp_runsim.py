@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import h5py
 import sys
 import argparse
 import multiprocessing as mp
@@ -9,6 +10,7 @@ import shutil
 import logging
 import hashlib
 import numpy
+import itertools
 from ising import Ising
 from blessings import Terminal
 from ext.progressbar import ProgressBar
@@ -44,9 +46,9 @@ def worker(tasks_queue, done_queue):
                 isingsim.evolve(pbar=bar)
 
         timestamp = time.strftime("%c")
-        job_report = "T={} time:{} (process {})".format(task["temperature"],
-                                                        timestamp,
-                                                        process_id)
+        job_report = "T={0:.3f} time:{} ".format(task["temperature"],
+                                            timestamp,
+                                            process_id)
         logging.info(job_report)
         done_queue.put(job_report)
 
@@ -132,6 +134,7 @@ class Pbar(object):
         return False
 
 
+
 if __name__ == "__main__":
 
     if sys.version_info < (3, 3):
@@ -167,10 +170,8 @@ if __name__ == "__main__":
     cfg = configparser.ConfigParser(interpolation=interpolation)
     cfg.read(ARGS.config)
 
-    jobs = [s for s in cfg.sections() if s.startswith('job')]
-
-    tasks = []
-    for job in jobs:
+    def job_to_tasks(job):
+        tasks = []
         for index, T in enumerate(numpy.linspace(int(cfg[job]['mintemp']),
                                                  int(cfg[job]['maxtemp']),
                                                  int(cfg[job]['steps']))):
@@ -182,50 +183,54 @@ if __name__ == "__main__":
                     "skip_n_steps":int(cfg[job]['skip_n_steps']),
                     "saveinterval":int(cfg[job]['saveinterval']),
                     "temperature": T,
-                    "filename":    os.path.normpath(cfg[job]['filename']),
-                    "h5path":      "/"+"sim_"+str(index).zfill(4)+"/",
-                    "steps":   int(cfg[job]['steps']),
+            #        "filename":    os.path.normpath(cfg[job]['filename']),
+            #        "h5path":      "/"+"sim_"+str(index).zfill(4)+"/",
+            #        "steps":   int(cfg[job]['steps']),
                    }
-            hash_ = hash_it(task)
-            tasks.append((task, hash_))
+            tasks.append(task)
+        return tasks
+    
+    def job_to_hashes(job):
+        tasks = job_to_tasks(job)
+        hashes = [hash_it(task) for task in tasks]
+        return hashes
 
-    for task, hash_ in tasks:
+    jobs = [job for job in cfg.sections() if job.startswith('job')]
+
+    tasks_grouped_by_job = [job_to_tasks(job) for job in jobs]
+    # tasks_grouped_by_job =  [ [t1, t2, t3], [t1, t2, t3], etc ]
+
+    hashes_grouped_by_job = [job_to_hashes(job) for job in jobs]
+    # hashes_grouped_by_job =  [ [h1, h2, h3], [h1, h2, h3], etc ]
+    
+    tasks_all_chained = list(itertools.chain(*tasks_grouped_by_job))
+    #chain(*[[1,2], [6,7,8]]) = [1,2,6,7,8]
+         
+    for task in tasks_all_chained:
         tasks_queue.put(task)
 
     jobswriter = CompletedJobsWriter(TERM, (5,7)) #TODO: unhardcode
-    for i in range(len(tasks)):
+    for i in range(len(tasks_all_chained)):
         jobswriter.print_line(done_queue.get())
 
     for i in range(ARGS.nr_workers):
         tasks_queue.put('STOP')
 
-    for job in jobs:
-        pass
-        """
-        TODO:
-        gather sharded hdf5 files
+    for i, job in enumerate(jobs):
 
-        09e4fcd9941bff1eef52419a9e02966addf9e86670fc809a65869e9300a3726e.hdf5  
-        14f239a7a685e529fc24ed8bef3e8b4a3545968f25e0d91e31defed61346f0c0.hdf5
-        1bb1cde86e573800717a132e6261b0270eabedc9ac2f8d52f989582419916fdb.hdf5
-        21a80cf0bcbd96a144ec5f2bb0ee8213a8edc8fcdcc961af2e5e5a68677c7c26.hdf5  ==> job1.hdf5
-        269f538eb345406a1b7bc29fc299f64aba6311ee554f741cbafcf8c1548acce2.hdf5
-        281948847904bac1596357d8c79d6a66c02e167cd9fb56034a5637649397dd54.hdf5
-        3186f7158270970d4d2a2ef7f43059716cdee36dec1efccbf5e88ab43a8aa490.hdf5
+        h = h5py.File(cfg[job]['filename'], 'w')
 
+        for index, hash_ in enumerate(hashes_grouped_by_job[i]):
+            f = h5py.File(TEMPDIR+hash_+'.hdf5', 'r')
 
-        3d96eac15eea7ca81617afd6bb662f0c685ba957eb30d851f26c7647779ca1f5.hdf5
-        3f01f6f8b87f505113a2be083c8a4a444c88c35de42179c5bb6b8525a65bb7ee.hdf5
-        50bd37a0e4e755cbc50d68ac4822ebbfcba875a44d901846594d9d186bd86152.hdf5
-        5408d75d3c4c0120c3d58f74e95388fd1cab3b3501b15f3ce266a57886dd9d5f.hdf5  ==> job2.hdf5
-        5c9fcfe585e65e262111dcbee7042d842229b018377bccd2bae723c1606d3499.hdf5
-        64b3fbc3f6d73b3b3dff67b0a0fd1747e38b4f7d8a8ab8e6dc1d1374aed91c16.hdf5
-        71294eec4746b37fca40d188e82fe03eafe14f58b34dc90442573a1fa87e5c2b.hdf5
+            h5path ="sim_"+str(index).zfill(4)+"/" 
+            h.create_group(h5path)
+            for key in f.keys():
+                h[h5path][key] = f[key].value
 
-        etc..
+            f.close()
 
-        """
-
+        h.close()
 
     logging.info('END LOG FILE : ' + time.strftime("%c"))
 
