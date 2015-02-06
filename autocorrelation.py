@@ -73,7 +73,7 @@ def make_acf_plot(h5pyfile, name, **kwargs):
     sims = h5pyfile.values()
     firstsim = list(h5pyfile.values())[0]
     shape = firstsim['shape'].value
-    algorithm = h5pyfile.attrs['mode']
+    algorithm = h5pyfile.attrs['algorithm']
 
     shape_as_string = str(shape[0][0])+" x "+str(shape[0][1])
     # shape_as_string = "20 x 20"

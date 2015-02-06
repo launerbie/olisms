@@ -12,7 +12,7 @@ from misc import print_sim_parameters as printer
 class Ising(object):
     """ Missing docstring """
     def __init__(self, shape, sweeps, temperature=10, aligned=False,
-                 mode='metropolis', handler=None,
+                 algorithm='metropolis', handler=None,
                  saveinterval=1, skip_n_steps=0):
         """
         Parameters
@@ -21,11 +21,11 @@ class Ising(object):
         sweeps : total number of sweeps to perform
         temperature: temperature
         aligned: create grid with all spins in the same direction
-        mode : algorithm to use. Choices are: ['metropolis', 'wolff']
+        algorithm : algorithm to use. Choices are: ['metropolis', 'wolff']
         handler: HDF5Handler instance
         saveinterval: interval (in sweeps) at which data is saved to hdf5
         """
-        self.mode = mode
+        self.algorithm = algorithm
         self.shape = tuple(shape)
         self.lattice_size = product(self.shape)
         self.temperature = temperature
@@ -62,8 +62,8 @@ class Ising(object):
 
             #consider numpy.string_(commit)
             self.handler.file.attrs['commit'] = commit
-            #consider numpy.string_(mode)
-            self.handler.file.attrs['mode'] = mode
+            #consider numpy.string_(algorithm)
+            self.handler.file.attrs['algorithm'] = algorithm
 
         else:
             self.writehdf5 = False
@@ -89,12 +89,12 @@ class Ising(object):
         self.calc_energy = get_calc_energy_function(self)
 
     def evolve(self, pbar):
-        if self.mode == 'metropolis':
+        if self.algorithm == 'metropolis':
             self.evolve_metropolis(pbar)
-        elif self.mode == 'wolff':
+        elif self.algorithm == 'wolff':
             self.evolve_wolff(pbar)
         else:
-            raise ValueError("Unknown mode")
+            raise ValueError("Unknown algorithm")
 
     def evolve_metropolis(self, pbar): #pbar shouldn't be mandatory argument
         """ Evolve it using Metropolis. """
@@ -174,12 +174,12 @@ class Ising(object):
 class IsingAnim(Ising):
 
     def evolve(self, *args, **kwds):
-        if self.mode == 'metropolis':
+        if self.algorithm == 'metropolis':
             self.evolve_metropolis(*args, **kwds)
-        elif self.mode == 'wolff':
+        elif self.algorithm == 'wolff':
             self.evolve_wolff(*args, **kwds)
         else:
-            raise ValueError("Unknown mode")
+            raise ValueError("Unknown algorithm")
 
     def evolve_metropolis(self, sleep=0):
         self.sweepcount = 0

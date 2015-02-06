@@ -27,34 +27,38 @@ def hash_it(a):
     h.update(str(a).encode('UTF-8'))
     hash_ = h.hexdigest()
     return hash_
-    
+
+
 def worker(tasks_queue, done_queue):
 
-    for task in iter(tasks_queue.get, 'STOP'):
+    for task, hash_ in iter(tasks_queue.get, 'STOP'):
         process_id = int((mp.current_process().name)[-1]) #find nicer way
         writer = Writer((0, process_id), TERM)
 
-        
+
         with Pbar(task, writer) as bar:
-            with HDF5Handler(filename=TEMPDIR+hash_it(task)+'.hdf5') as h:
-                isingsim = Ising(shape=task['shape'], sweeps=task['mcs'], 
-                                 temperature=task['temperature'], 
+            with HDF5Handler(filename=TEMPDIR+hash_+'.hdf5') as h:
+                isingsim = Ising(shape=task['shape'], sweeps=task['mcs'],
+                                 temperature=task['temperature'],
                                  aligned=task['aligned'],
-                                 mode=task['algorithm'], handler=h,
+                                 algorithm=task['algorithm'], handler=h,
                                  saveinterval=task['saveinterval'],
                                  skip_n_steps=task['skip_n_steps'])
                 isingsim.evolve(pbar=bar)
 
-        timestamp = time.strftime("%c")
-        job_report = "T={} time:{}".format(task["temperature"],timestamp)
+        timestamp = time.strftime("%d %b %Y %H:%M:%S")
+        job_report = "T={0:.3f}  {1}".format(task["temperature"],timestamp)
         logging.info(job_report)
         done_queue.put(job_report)
 
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', required=True, help="Config file")
-    parser.add_argument('--logfile', default='log_foo', help="logfile")
-    parser.add_argument("--workers", dest='nr_workers', default=4,
+    parser.add_argument('-d', '--outputdir', required=True, help="Target\
+                        directory for hdf5 files")
+    parser.add_argument('-p', '--prefix', default="", help="adds [prefix] to filenames")
+    parser.add_argument('-l', '--logfile', default='log_foo', help="logfile")
+    parser.add_argument('-w', "--workers", dest='nr_workers', default=4,
                         type=int, help="Number of workers")
     args = parser.parse_args()
     return args
@@ -143,7 +147,7 @@ if __name__ == "__main__":
         import configparser
 
     ARGS = get_arguments()
-    TEMPDIR = '/tmp/ising_data/'
+    TEMPDIR = '/tmp/olisms/'
 
     if not os.path.exists(TEMPDIR):
         os.makedirs(TEMPDIR)
@@ -170,28 +174,44 @@ if __name__ == "__main__":
 
     def job_to_tasks(job):
         tasks = []
-        for index, T in enumerate(numpy.linspace(int(cfg[job]['mintemp']),
-                                                 int(cfg[job]['maxtemp']),
+        for index, T in enumerate(numpy.linspace(float(cfg[job]['mintemp']),
+                                                 float(cfg[job]['maxtemp']),
                                                  int(cfg[job]['steps']))):
             task = {
                     "algorithm":   str(cfg[job]['algorithm']),
-                    "shape":       tuple(int(i) for i in cfg[job]['shape'].split('x')),
+                    "shape":       tuple(int(i) for i in \
+                                         cfg[job]['shape'].split('x')),
                     "aligned":     bool(cfg[job]['aligned']),
                     "mcs":         int(cfg[job]['mcs']),
                     "skip_n_steps":int(cfg[job]['skip_n_steps']),
                     "saveinterval":int(cfg[job]['saveinterval']),
                     "temperature": T,
-            #        "filename":    os.path.normpath(cfg[job]['filename']),
-            #        "h5path":      "/"+"sim_"+str(index).zfill(4)+"/",
-            #        "steps":   int(cfg[job]['steps']),
                    }
             tasks.append(task)
         return tasks
-    
+
     def job_to_hashes(job):
         tasks = job_to_tasks(job)
         hashes = [hash_it(task) for task in tasks]
         return hashes
+
+    def unique_filename_from_job(job):
+        identifier = "{algorithm}_{shape}_MCS{mcs}_si{saveinterval}_\
+                      minT{mintemp}_maxT{maxtemp}_{steps}_\
+                      {aligned}".format(**cfg[job])
+
+        identifier_no_whitespace = identifier.replace(" ", "")
+        return identifier_no_whitespace
+
+
+    def filename_from_job(job):
+        data_dir = ARGS.outputdir
+        prefix = ARGS.prefix
+
+        job_id = unique_filename_from_job(job)
+
+        abs_path = "{data_dir}/{prefix}{job_id}.hdf5".format(**locals())
+        return abs_path
 
     jobs = [job for job in cfg.sections() if job.startswith('job')]
 
@@ -200,28 +220,35 @@ if __name__ == "__main__":
 
     hashes_grouped_by_job = [job_to_hashes(job) for job in jobs]
     # hashes_grouped_by_job =  [ [h1, h2, h3], [h1, h2, h3], etc ]
-    
+
     tasks_all_chained = list(itertools.chain(*tasks_grouped_by_job))
     #chain(*[[1,2], [6,7,8]]) = [1,2,6,7,8]
-         
-    for task in tasks_all_chained:
-        tasks_queue.put(task)
 
-    jobswriter = CompletedJobsWriter(TERM, (5,7)) #TODO: unhardcode
+    hashes_all_chained = list(itertools.chain(*hashes_grouped_by_job))
+
+    for task, hash_ in zip(tasks_all_chained, hashes_all_chained):
+        tasks_queue.put((task, hash_))
+
+    jobswriter = CompletedJobsWriter(TERM, (2,7)) #TODO: unhardcode
     for i in range(len(tasks_all_chained)):
         jobswriter.print_line(done_queue.get())
 
     for i in range(ARGS.nr_workers):
         tasks_queue.put('STOP')
 
+
+    # Merge the sharded HDF5 files
     for i, job in enumerate(jobs):
 
-        h = h5py.File(cfg[job]['filename'], 'w')
+        h = h5py.File(filename_from_job(job), 'w')
+
+        for key in cfg[job]:
+            h.attrs[key] = cfg[job][key]
 
         for index, hash_ in enumerate(hashes_grouped_by_job[i]):
             f = h5py.File(TEMPDIR+hash_+'.hdf5', 'r')
 
-            h5path ="sim_"+str(index).zfill(4)+"/" 
+            h5path ="sim_"+str(index).zfill(4)+"/"
             h.create_group(h5path)
             for key in f.keys():
                 h[h5path][key] = f[key].value
@@ -231,5 +258,6 @@ if __name__ == "__main__":
         h.close()
 
     logging.info('END LOG FILE : ' + time.strftime("%c"))
+
 
 
