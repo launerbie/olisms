@@ -23,6 +23,11 @@ The simulations are then processed by an x number of workers.
 """
 
 def hash_it(a):
+    """
+    Hashes the string <a> using SHA256. The hash is used to give the
+    sharded HDF5 files unique filenames. Each shards correspond to a
+    unique (shape, algorithm, temperature, etc..) task.
+    """
     h = hashlib.sha256()
     h.update(str(a).encode('UTF-8'))
     hash_ = h.hexdigest()
@@ -30,11 +35,19 @@ def hash_it(a):
 
 
 def worker(tasks_queue, done_queue):
+    """
+    Pulls a task from the task queue and initiates the ising model
+    simulation.
+
+    Ising.evolve() is run within the context of HDF5Handler so a
+    handler can be passed to Ising object. The HDF5Handler context
+    block is run within the context of Pbar to track the progress
+    of the simulation.
+    """
 
     for task, hash_ in iter(tasks_queue.get, 'STOP'):
         process_id = int((mp.current_process().name)[-1]) #find nicer way
         writer = Writer((0, process_id), TERM)
-
 
         with Pbar(task, writer) as bar:
             with HDF5Handler(filename=TEMPDIR+hash_+'.hdf5') as h:
@@ -56,7 +69,8 @@ def get_arguments():
     parser.add_argument('-c', '--config', required=True, help="Config file")
     parser.add_argument('-d', '--outputdir', required=True, help="Target\
                         directory for hdf5 files")
-    parser.add_argument('-p', '--prefix', default="", help="adds [prefix] to filenames")
+    parser.add_argument('-p', '--prefix', default="", help="adds [prefix]\
+                        to filenames")
     parser.add_argument('-l', '--logfile', default='log_foo', help="logfile")
     parser.add_argument('-w', "--workers", dest='nr_workers', default=4,
                         type=int, help="Number of workers")
@@ -147,7 +161,7 @@ if __name__ == "__main__":
         import configparser
 
     ARGS = get_arguments()
-    TEMPDIR = '/tmp/olisms/'
+    TEMPDIR = '/tmp/olisms/' #Temporary directory to output hdf5 shards.
 
     if not os.path.exists(TEMPDIR):
         os.makedirs(TEMPDIR)
@@ -173,6 +187,7 @@ if __name__ == "__main__":
     cfg.read(ARGS.config)
 
     def job_to_tasks(job):
+        """  Seperates a job into tasks. """
         tasks = []
         for index, T in enumerate(numpy.linspace(float(cfg[job]['mintemp']),
                                                  float(cfg[job]['maxtemp']),
@@ -191,6 +206,8 @@ if __name__ == "__main__":
         return tasks
 
     def job_to_hashes(job):
+        """ Calculates a hash for each task. The hash will be used to uniquely
+        determine the filenames of the sharded hdf5 files.  """
         tasks = job_to_tasks(job)
         hashes = [hash_it(task) for task in tasks]
         return hashes
