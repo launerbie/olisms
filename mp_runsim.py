@@ -25,7 +25,7 @@ The simulations are then processed by an x number of workers.
 def hash_it(a):
     """
     Hashes the string <a> using SHA256. The hash is used to give the
-    sharded HDF5 files unique filenames. Each shards correspond to a
+    sharded HDF5 files unique filenames. Each shard correspond to a
     unique (shape, algorithm, temperature, etc..) task.
     """
     h = hashlib.sha256()
@@ -50,7 +50,8 @@ def worker(tasks_queue, done_queue):
         writer = Writer((0, process_id), TERM)
 
         with Pbar(task, writer) as bar:
-            with HDF5Handler(filename=TEMPDIR+hash_+'.hdf5') as h:
+            with HDF5Handler(filename=ARGS.tempdir+'/'+hash_+'.hdf5') as h:
+                time_start = time.time()
                 isingsim = Ising(shape=task['shape'], sweeps=task['mcs'],
                                  temperature=task['temperature'],
                                  aligned=task['aligned'],
@@ -58,9 +59,21 @@ def worker(tasks_queue, done_queue):
                                  saveinterval=task['saveinterval'],
                                  skip_n_steps=task['skip_n_steps'])
                 isingsim.evolve(pbar=bar)
+                runtime = round(time.time() - time_start, 2)
 
-        timestamp = time.strftime("%d %b %Y %H:%M:%S")
-        job_report = "T={0:.3f}  {1}".format(task["temperature"],timestamp)
+
+        subs = {'temp'     : task["temperature"],
+                'shape'    : task['shape'],
+                'algo'     : task['algorithm'],
+                'aligned'  : task['aligned'],
+                'mcs'      : task['mcs'],
+                'runtime'  : runtime,
+                'timestamp': time.strftime("%d %b %Y %H:%M:%S")
+                }
+
+        s = "T={temp:.3f}  {shape}  {algo}  {aligned}  {mcs} {runtime:.2f}  {timestamp} "
+        job_report = s.format(**subs)
+
         logging.info(job_report)
         done_queue.put(job_report)
 
@@ -69,9 +82,10 @@ def get_arguments():
     parser.add_argument('-c', '--config', required=True, help="Config file")
     parser.add_argument('-d', '--outputdir', required=True, help="Target\
                         directory for hdf5 files")
+    parser.add_argument('-t', '--tempdir', default='/tmp/olisms/')
     parser.add_argument('-p', '--prefix', default="", help="adds [prefix]\
                         to filenames")
-    parser.add_argument('-l', '--logfile', default='log_foo', help="logfile")
+    parser.add_argument('-l', '--logfile', default=None, help="logfile")
     parser.add_argument('-w', "--workers", dest='nr_workers', default=4,
                         type=int, help="Number of workers")
     args = parser.parse_args()
@@ -161,15 +175,23 @@ if __name__ == "__main__":
         import configparser
 
     ARGS = get_arguments()
-    TEMPDIR = '/tmp/olisms/' #Temporary directory to output hdf5 shards.
 
-    if not os.path.exists(TEMPDIR):
-        os.makedirs(TEMPDIR)
+
+    if not os.path.exists(ARGS.tempdir):
+        os.makedirs(ARGS.tempdir)
     else:
-        shutil.rmtree(TEMPDIR)
-        os.makedirs(TEMPDIR)
+        shutil.rmtree(ARGS.tempdir)
+        os.makedirs(ARGS.tempdir)
 
-    logging.basicConfig(filename=ARGS.logfile, level=logging.DEBUG,)
+    interpolation = configparser.ExtendedInterpolation()
+    cfg = configparser.ConfigParser(interpolation=interpolation)
+    cfg.read(ARGS.config)
+
+    if ARGS.logfile is not None:
+        logging.basicConfig(filename=ARGS.logfile, level=logging.DEBUG,)
+    else:
+        logging.basicConfig(filename=cfg['log']['logfile'], level=logging.DEBUG,)
+
     logging.info('START LOG FILE : ' + time.strftime("%c"))
     TERM = Terminal()
     print(TERM.clear())
@@ -182,9 +204,6 @@ if __name__ == "__main__":
         p = mp.Process(target=worker, args=(tasks_queue, done_queue)).start()
         processpool.append(p)
 
-    interpolation = configparser.ExtendedInterpolation()
-    cfg = configparser.ConfigParser(interpolation=interpolation)
-    cfg.read(ARGS.config)
 
     def job_to_tasks(job):
         """  Seperates a job into tasks. """
@@ -196,7 +215,8 @@ if __name__ == "__main__":
                     "algorithm":   str(cfg[job]['algorithm']),
                     "shape":       tuple(int(i) for i in \
                                          cfg[job]['shape'].split('x')),
-                    "aligned":     bool(cfg[job]['aligned']),
+                    "aligned":     True if cfg[job]['aligned'] == 'True' \
+                                        else False,
                     "mcs":         int(cfg[job]['mcs']),
                     "skip_n_steps":int(cfg[job]['skip_n_steps']),
                     "saveinterval":int(cfg[job]['saveinterval']),
@@ -263,7 +283,7 @@ if __name__ == "__main__":
             h.attrs[key] = cfg[job][key]
 
         for index, hash_ in enumerate(hashes_grouped_by_job[i]):
-            f = h5py.File(TEMPDIR+hash_+'.hdf5', 'r')
+            f = h5py.File(ARGS.tempdir+'/'+hash_+'.hdf5', 'r')
 
             h5path ="sim_"+str(index).zfill(4)+"/"
             h.create_group(h5path)
