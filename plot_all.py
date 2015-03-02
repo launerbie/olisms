@@ -68,25 +68,23 @@ def main():
 
 
         if algorithm == 'wolff': #FALSE for python3!
-            MCS0 = 4000 #cut-off point
-            time = firstsim['clusterflip'][-MCS0:]
+            time = firstsim['clusterflip']
         else:
-            MCS0 = 5000 #cut-off point
-            time = firstsim['sweep'][-MCS0:]
+            time = firstsim['sweep']
 
 
         for sim in f.values(): #Each sim corresponds to a simulation at some Temperature
             T = sim['temperature'][0]
-            M = sim['magnetization'][-MCS0:]
+            M = sim['magnetization'].value
             net_M = abs(M)
-            E = sim['energy'][-MCS0:]
+            E = sim['energy'].value
 
             temperatures.append(T)
             avg_net_mags.append(numpy.mean(net_M))
             chi.append(1/(T*N)*numpy.var(net_M))
 
             #temperature based linecolor
-            norm = colors.Normalize(vmin=2.0,vmax=3.0)
+            norm = colors.Normalize(vmin=2.0,vmax=3.5)
             linecolor = cmap(norm(T))
 
             ax3.plot(time, E, color=linecolor)
@@ -110,6 +108,10 @@ def main():
         ax3.set_ylabel('E')
         ax4.set_ylabel('|M|')
 
+        if args.xlim is not None:
+            ax3.set_xlim(*args.xlim)
+            ax4.set_xlim(*args.xlim)
+
 
 
         maps = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -117,7 +119,7 @@ def main():
         maps._A = [] #TODO: remove ugly hack
         plt.colorbar(maps, cax=cax)
 
-        fig.suptitle('{}\n {} {}  sampling interval {}'.format(f.filename, algorithm, shape, int(saveinterval) ) ,fontsize=12)
+        fig.suptitle('{}\n'.format(f.filename), fontsize=12)
 
         if not args.plot:
             plt.savefig(directory+"/"+str(name)+"_summary"+".png", bbox_inches='tight')
@@ -132,6 +134,7 @@ def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('filename', metavar="HDF5 FILENAME")
     parser.add_argument('--plot', action='store_true')
+    parser.add_argument('--xlim', nargs=2, default=None, metavar="xbegin xend", type=int)
     args = parser.parse_args()
     return args
 
