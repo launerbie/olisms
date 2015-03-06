@@ -4,12 +4,6 @@ import os
 import h5py
 import numpy
 import argparse
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib import colors
-import matplotlib.gridspec as gridspec
 from pprint import pprint
 from misc import product
 
@@ -20,6 +14,7 @@ voor een plaatje met deze colormaps.
 """
 
 def main():
+    print("backend:", mpl.get_backend())
     directory = args.outputdir
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -116,12 +111,13 @@ def plot_summary(f, name, directory):
 
     fig.suptitle('{}\n'.format(f.filename), fontsize=12)
 
-    if not args.plot:
+    if args.plot is False:
         plt.savefig(directory+"/"+str(name)+"_summary"+".png", bbox_inches='tight')
         fig.clf()
         plt.close()
     else:
         plt.show()
+    #plt.show()
 
 
 def get_arguments():
@@ -136,4 +132,17 @@ def get_arguments():
 if __name__ == "__main__":
     args = get_arguments()
     print(args)
+
+    import matplotlib as mpl
+
+    if args.plot is True:
+        mpl.use('TkAgg')
+    else:
+        mpl.use('Agg')
+
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+    from matplotlib import colors
+    import matplotlib.gridspec as gridspec
+
     main()
