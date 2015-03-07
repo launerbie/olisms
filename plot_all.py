@@ -76,11 +76,11 @@ def plot_summary(f, name, directory):
         chi.append(1/(T*N)*numpy.var(net_M))
 
         #temperature based linecolor
-        norm = colors.Normalize(vmin=2.0,vmax=3.5)
+        norm = colors.Normalize(vmin=args.bounds[0], vmax=args.bounds[1])
         linecolor = cmap(norm(T))
 
-        ax3.plot(time, E, color=linecolor)
-        ax4.plot(time, net_M, color=linecolor)
+        ax3.plot(time, E/N, color=linecolor)
+        ax4.plot(time, net_M/N, color=linecolor)
 
     ax1.plot(temperatures, numpy.array(avg_net_mags)/N, c='k', marker='o', ms=4)
     ax2.plot(numpy.array(temperatures), chi, c='k', marker='o', ms=4)
@@ -126,6 +126,7 @@ def get_arguments():
     parser.add_argument('--outputdir', default='figures')
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--xlim', nargs=2, default=None, metavar="xbegin xend", type=int)
+    parser.add_argument('--bounds', nargs=2, default=[2.0, 3.0], metavar="vmin vmax", type=float)
     args = parser.parse_args()
     return args
 
