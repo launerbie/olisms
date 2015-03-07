@@ -24,7 +24,7 @@ def animate_evolution():
     fig1 = plt.figure()
     ax = fig1.add_subplot(111)
     i = IsingAnim(args.shape, args.iterations, temperature=args.T, aligned=args.aligned,
-              mode=args.algorithm)
+              algorithm=args.algorithm)
 
     grid_2d = i.grid.reshape(args.shape[0], args.shape[1])
 
