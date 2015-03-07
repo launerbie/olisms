@@ -114,7 +114,7 @@ class Ising(object):
 
             if sweep % self.saveinterval == 0 and sweep >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.put(sweep, 'sweep', dtype='int16')
+                    self.handler.put(sweep, 'sweep', dtype='int32')
                     self.handler.put(self.calc_energy(), 'energy')
                     self.handler.put(self.magnetization, 'magnetization')
 
@@ -164,7 +164,7 @@ class Ising(object):
 
             if flip % self.saveinterval == 0 and flip >= self.skip_n_steps:
                 if self.writehdf5:
-                    self.handler.put(flip, 'clusterflip', dtype='int16')
+                    self.handler.put(flip, 'clusterflip', dtype='int32')
                     self.handler.put(self.calc_energy(), 'energy')
                     self.handler.put(self.magnetization, 'magnetization')
 
