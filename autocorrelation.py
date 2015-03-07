@@ -15,7 +15,6 @@ from misc import drawwidget
 from misc import get_basename
 from misc import acf
 
-# TODO: select only a subset of available Temperatures
 # TODO: seperate arguments for enery acf figure and magnetization acf figure
 # TODO: logscale
 
@@ -115,6 +114,9 @@ def make_acf_plot(h5pyfile, name, **kwargs):
 
     plt.savefig(targetdir + "/" + name + img_suffix + ".png",
                 bbox_inches='tight', dpi=dpi)
+
+    fig.clf()
+    plt.close()
 
     pbar.finish()
 
