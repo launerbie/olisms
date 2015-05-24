@@ -86,7 +86,9 @@ def make_acf_plot(h5pyfile, name, **kwargs):
         pbar.update(simnr)
         temperature = sim['temperature'][0]
         timeseriesdata = sim[h5path]
-        ax1.plot(acf(timeseriesdata, length), c=cmap(norm(temperature)))
+        label_string = r"$\beta$ = " + str(round(1./temperature, 2))
+        ax1.plot(acf(timeseriesdata, length), label=label_string)
+#        ax1.plot(acf(timeseriesdata, length), c=cmap(norm(temperature)))
 
     if algorithm == 'metropolis':
         ax1.set_xlabel('lag [in sweeps ]')
@@ -98,6 +100,7 @@ def make_acf_plot(h5pyfile, name, **kwargs):
         ax1.set_xlabel('lag [in ??]')
 
     ax1.set_ylabel('C (lag)')
+    ax1.legend(bbox_to_anchor=(1, 0.95))
 
     if xlim:
         ax1.set_xlim(*xlim)
@@ -110,14 +113,26 @@ def make_acf_plot(h5pyfile, name, **kwargs):
     if ylog is True:
         ax1.set_yscale('log')
 
+    ax1.tick_params(
+        axis = 'x',
+        which = 'both',
+        bottom = 'on',
+        top = 'off')
+
+    ax1.tick_params(
+        axis = 'y',
+        which = 'both',
+        left = 'off',
+        right = 'off')
+
 
     substitutions = (h5path, shape_as_string, algorithm)
-    ax1.set_title("Time series data: {} \n{} {}".format(*substitutions))
+#    ax1.set_title("Time series data: {} \n{} {}".format(*substitutions))
 
-    scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    scalarmap._A = [] #How to get around this?
-    cbbar_handle = plt.colorbar(scalarmap)
-    cbbar_handle.set_label('Temperature')
+#    scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+#    scalarmap._A = [] #How to get around this?
+#    cbbar_handle = plt.colorbar(scalarmap)
+#    cbbar_handle.set_label('Temperature')
 
     plt.savefig(targetdir + "/" + name + img_suffix + ".png",
                 bbox_inches='tight', dpi=dpi)
@@ -135,7 +150,7 @@ def get_arguments():
     parser.add_argument('--ylim', nargs=2, metavar="ybegin yend", type=float)
     parser.add_argument('--norminterval', nargs=2, metavar="vmin vmax", type=float)
     parser.add_argument('--length', default=500, type=int)
-    parser.add_argument('--runbright', action="store_true")
+    #parser.add_argument('--runbright', action="store_true")
     parser.add_argument('--ylog', action="store_true")
     parser.add_argument('--dpi', default=80, type=int)
     arguments = parser.parse_args()
@@ -143,10 +158,10 @@ def get_arguments():
 
 def main():
     """ Create figures in the target directory ARGS.targetdir. """
-    if ARGS.runbright:
-        runbright()
-    else:
-        rundark()
+    #if ARGS.runbright:
+    #    runbright()
+    #else:
+    #    rundark()
 
     if not os.path.exists(ARGS.targetdir):
         os.makedirs(ARGS.targetdir)
