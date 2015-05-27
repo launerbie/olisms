@@ -1,0 +1,284 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{bm}
+\usepackage{calligra}
+\usepackage{wrapfig}
+\usepackage{comment}
+\usepackage{subcaption}
+\usepackage{color}
+
+%\DeclareMathAlphabet{\mathcalligra}{T1}{calligra}{m}{n}
+%\DeclareFontShape{T1}{calligra}{m}{n}{<->s*[2.2]callig15}{}
+
+\setlength{\parindent}{0pt}
+\graphicspath{ {/home/lau/scratch/oli/plots_section_1/} }
+
+\DeclarePairedDelimiter{\avg}{\langle}{\rangle}
+
+\title{The Lau/Ostoji\'c Ising model simulation}
+\date{}
+\author{Bernie Lau and Oliver Ostoji\'c}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+This project is in essence an investigation of the Ising Hamiltonian with no external field;\footnote{As always,
+$\avg{i,j}$ indicates a sum over nearest neighbors}
+
+\begin{equation}\label{eq:Hamiltonian}
+    H = -J \sum_{\avg*{i,j}} s_i s_j
+\end{equation}
+
+As this apparently simple Hamiltonian is known to result in very interesting and rich dynamical behavior on a 
+ macroscopic scale, we endeavor to find, through computational methods, some interesting thermodynamical quantities
+ and qualitative behaviors. Of primary interest is the search for signs of a phase transistion, which the two and three
+ dimensional Ising model is known to exhibit.
+
+ In order to be less vague, we shall from now on talk about the Ising Hamiltonian
+ in the context of ferromagnetism, where the quantites $s_i$ are associated with electron spins which can point in one of two
+ directions. We will also set the coupling energy and the Boltzmann canstant equal to one, 
+ $J = k_B = 1$, for all simulations. As a consequence, the inverse temperature $\beta = 1/k_BT$ is measured in unphysical
+ units. This is justified by the
+ fact that  we are primarily interested in the qualitative behavior of the system and all actual numbers in the following
+ simulations can still be compared to theoretical calculations and similar simulations.
+
+ Phase transitions are typically characterized by rapid changes in macroscopic quantities near the transition temperature, which
+ is called the critical temperature, $T_c$. The macroscopic quantities we will be investigating are the net magnetization,
+ $M = \sum_i s_i$, the magnetic susceptibility (a measure for how the magnetization reacts to external magnetic fields) and
+ the correlation length (a measure for the length scale at which the spins influence each other). These quantities and their
+ connection to phase transitions will be made more concrete in the relevant sections. 
+
+ The actual methods we employ are two Monte Carlo type algorithms, with most simulations carried out using a 
+ Metropolis algorithm and a couple of measurements using a Wolff algorithm. It seems appropriate therefore, to summarize the
+ principles of those algorithms here, in a minimalistic fashion.
+
+\subsection{Metropolis algorithm}
+As the focus of this assignment is on the \textit{implementation} of the Metropolis algorithm rather than its theoretical
+ aspects, we have chosen to omit the technical details and just outline the procedure used in its implementation here.
+
+ Given a
+ lattice with a spin variable $s_i \in \{-1,1\}$ on each lattice point $i$, we define a "state" to be a particular
+ configuration of all the ${s_i}$. The energy $E_\mu$ of the system in a state $\mu$ is determined by the Hamiltonian
+ (Equation \ref{eq:Hamiltonian}). Time evolution of the system is achieved by randomly choosing a single site $j$ and determining
+ the energy $E_\nu$ of the system if the spin on that site were flipped, $s_j \rightarrow -s_j$. Weather or not we actually flip
+ the spin is determined by the the number $A(\mu \rightarrow \nu)$ given by;
+
+
+\begin{equation}\label{eq:A-ratio}
+    A(\mu \rightarrow \nu) = \begin{cases}
+        e^{-\beta (E_\nu - E_\mu)} & \mbox{if} \,\,  E_\nu - E_\mu > 0 \\
+        1 & \mbox{else}
+    \end{cases}
+\end{equation}
+
+Once the spin flip is accepted or rejected, the process is repeated and each iteration is called a "Monte Carlo step". It is actually
+ this particular definiton of the so called
+ "acceptance ratio", $A(\mu \rightarrow \nu)$ that makes the algorihm a Metropolis algorithm,
+ the rest of the procedure is common to all single spin-flip dynamics Monte Carlo algorithms. The conditions
+ of detailed balance and ergodicity, which ensure that the
+ equilibrium state of the system will behave according to Boltzmann statistics and that each state can be reached from each other state, are
+ statisfied by this acceptance ratio, as must be the case with all Monte Carlo algorithms.
+
+
+\subsection{Wolff algorithm}
+An example of a cluster-flipping algorithm, the Wolff algorithm works by iteratively picking out
+ an entire cluster of spins pointing in the same direction and then flipping them all at the same time. The actual physics content of this 
+ procedure is contained in the generation of the cluster, which is done based on a temperature dependent probability chosen such that the
+ conditions of detailed balance and ergodicity are satisfied.
+ More specifically, the procedure which is iterated is as follows;
+ \begin{enumerate}
+ \item Pick a spin at random and look at all its neighbors.
+ \item If a neighbor is pointing in the same direction as the current one, add it to the cluster with a probability $P_{add}$ given by
+
+\begin{equation}\label{eq:A-ratio}
+    P_{add} = 1 - e^{-2\beta J}
+\end{equation}
+ 
+
+ \item For each spin that was added, look at all \textit{its} neighbors and add them with the same probability. Do this until no spins are left
+ in the cluster whose neighbors have not been considered for addition.
+ \item Flip the cluster
+
+ \end{enumerate}
+
+The Wolff algorithm, although less intuitive than Metropolis has the advantage of being much faster near the critical temperature, thereby
+ allowing us to obtain more accurate results in the region of interest.
+
+
+\pagebreak
+
+
+%###################################################################################################################################
+%########################## SECTION: Thermalization and autocorrelation for the 40x40 lattice ######################################
+%################################################################################################################################### 
+
+
+
+
+\section{Thermalization and autocorrelation for the 40x40 lattice}
+
+
+In this section we present some results of a simulation of a 40x40 two dimensional Ising model, using a Metropolis algorithm.
+ We present plots of energy and magnetization as a function of time and report the thermalization times found for each plot.
+ We also plot autocorrelation functions for both enery and magnetization
+ for five values of the inverse temperature $\beta$ between $\beta = 0.33$ and $\beta = 1.0$. 
+ Both high temperature (fully disordered) and low temperature (all spins aligned) initial conditions are simulated.
+ Time is measured in Monte-Carlo steps per spin for all simulations. One Monte-Carlo step per spin is called a "sweep", so
+ in the case of the 40x40 lattice, which contains 1600 spins, one sweep would correspond to 1600 spin flips. 
+
+
+%####
+%########################## SUBSECTION: Thermalization times ######################################
+%####
+
+
+\subsection{Thermalilzation times}
+To find the thermalization times, we plot the energy and magnetization as a function of time and read off the time (in sweeps) that
+ it takes the energy and the magnetization to reach a constant value. Both the energy and the magnetization are functions of the spin
+ variables so, if all is well, the thermalization times for energy and magnetization should be the same. 
+ Since we are not using a rigorous procedure the times we obtain in this section will not be the exact thermalization times but will none 
+ the less serve as a rough estimate for setting the parameters in later simulations. 
+
+Figure \ref{fig:enmvt_false} shows the plots of the energy and the magnetization as a function of time, starting in fully disordered state 
+ corresponding to a high temperature (small $\beta$) state. Both energy and net magnetization are measured per spin, so the values along
+ the axes are obtained by first computing total energy and total magnetization of the whole lattice and then dividing through the number
+ of spins, in this case 1600. Five values of $\beta$ are simulated: $\beta = 0.33$; $\beta = 0.4$;
+ $\beta = 0.5$; $\beta = 0.67$ and $\beta = 1.0$. 
+
+
+\begin{figure}[h!]
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metropolis_40x40_MCS700_si1_minT1_maxT3_5_False_Energy_and_Magnetization.png}}
+  \caption{Shown are the plots of energy per spin (left) and net magnetization per spin (right) as functions of time
+    for a 40x40 two dimensional lattice. The starting condition is a fully
+    disordered state corresponding to high temperature. Time is measured in sweeps, one sweep corresponds to 1600 spin
+    flips. The maximum thermalization time is about 400 sweeps, and occurs for $\beta = 0.5$.}
+
+\label{fig:enmvt_false}
+\end{figure}
+
+From the plots in Figure \ref{fig:enmvt_false}, we can conclude that the maximum thermalization time for this 40x40 lattice is about 400 sweeps for the high temperature starting condition. Only the maximum thermalization time is of practical importance for us because we will need to
+ conduct measurements on systems in thermal equilibrium for all future simulations. Therefore knowing the maximum thermalization time is
+ enough, as it will ensure that all systems will be in thermal equilibrium after allowing them to evolve this amount of time. The maximum 
+ thermalization time occurs for $\beta = 0.5$ which could indicate that the phase transition is around that value. The remarkable thing
+ is that the net magnetization (in equilibrium) is also maximal for $\beta = 0.5$ (rather than $\beta = 1$) in this simulation, while we
+ expect that the system tends to an increasingly ordered state, and therefore higher net magnetization, with increasing $\beta$. 
+
+
+
+\pagebreak
+
+Figure \ref{fig:enmvt_true} again shows plots of energy and magnetization as functions of time, but this time starting in a fully ordered
+ state corresponding to a low temperature situation. 
+
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metropolis_40x40_MCS700_si1_minT1_maxT3_5_True_Energy_and_Magnetization.png}}
+  \caption{Shown are the plots of energy per spin (left) and net magnetization per spin (right) as functions of time
+    for a 40x40 two dimensional lattice. The starting condition is now a fully
+    ordered state corresponding to low temperature. Time is measured in sweeps, one sweep corresponds to 1600 spin
+    flips. The maximum thermalization time is about 200 sweeps, and occurs for $\beta = 0.4$.}
+
+\label{fig:enmvt_true}
+\end{figure}
+
+From Figure \ref{fig:enmvt_true} we can conclude that the maximum thermalizaion time for the low temperature starting condition is about
+ 200 sweeps, and this number is confirmed by both the energy and magnetization measurements. It occurs for $\beta = 0.4$ for this low 
+ temperature starting condition. 
+
+%####
+%########################## SECTION: Autocorrelation functions ######################################
+%####
+
+
+\subsection{Autocorrelation functions}
+From the simulations in the previous section we extracted the thermalization times for our 40x40 grid. In addition to the thermalization
+ time, the other relevant time parameter is the autocorrelation time. Autocorrelation is, roughly and broadly speaking, a measure for the
+ similarity of some system with itself at different times. The variable on which autocorrelation depends is therefore the \textit{difference}
+ between two time instances which is called "lag". The admissible values for autocorrelation are the range $[0,1]$, with $1$ meaning
+ the system is identical to itself and $0$ meaning the system bears no resemblence to itself at all.
+ The autocorrelation \textit{time} is the minimal amount of time that needs to pass for the sytem to no
+ longer bear resemblence to itself, so for the autocorrelation to be zero. The reason we are interested in autocorrelation times is this:
+ if we have a time dependent statistical process from which we
+ take samples at different times and the autocorrelation between those samples is zero, those samples are statistically independent from 
+ one another. We therefore interpret the autocorrelation time as the parameter that tells us how long we need to wait before we can take
+ another statistically independent sample. 
+ \\ 
+ 
+
+ For us, "system" means either the equilibrium energy or the net magnetization for a given simulation, so for a given grid 
+ size, value of $\beta$ and beginning condition (and algorithm). \\
+ So the question we are trying to answer in this section is: Given the equilibrium energy (or magnetization) for a certain simulation, as a
+ function of time, what is the minimum amount of time that needs to pass before the autocorrelation is zero. 
+ The autocorrelation functions of the energy and net magnetization are defined through the following two formulas:
+
+\begin{equation*}
+    c_e(\Delta t) = \avg{(E(t+\Delta t) - E_{avg})\cdot (E(t)-E_{avg})}_t
+\end{equation*}
+
+and
+
+\begin{equation*}
+    c_m(\Delta t) = \avg{(M(t+\Delta t) - M_{avg})\cdot (M(t)-M_{avg})}_t
+\end{equation*}
+
+
+where, $E_{avg}$ and $M_{avg}$ indicate the average value of the energy and magnetization in thermal equilibrium and $\Delta t$
+ is the time difference or "lag" between samples taken.
+ This in contrast to the averaging indicated by the $\avg{}_t$, which means we average over the number of
+ sweeps. The subscript $t$ indicates averaging over time, which is, as discussed above, measured in sweeps in the
+ the case of the metropolis algorithm. 
+
+To put this into practice, we carried out simulations of a 40x40 grid like above, but we let it run for 200000 sweeps, and only 
+ start saving data after the 500'th sweep, in order to assure that we are in thermal equilibrium. The value of 500 is based on the
+ measurements above. In contrast to above, we only carried out simulations with the high temperature (disordered) beginning condition. 
+ The autocorrelation times were then computed for $\Delta t$ in the range $[0,250]$ sweeps. We carried out this procedure for the values
+ $\beta = 0.33$; $\beta = 0.36$; $\beta = 0.4$l $\beta = 0.44$ and $\beta = 0.5$ and for both the energy and the net magnetization. The 
+ results are shown in Figures \ref{fig:ac_energy} and \ref{fig:ac_mag}. 
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{ac1_metropolis_40x40_MCS200000_si1_minT2_maxT3_5_False_energy_acf.png}}
+  \caption{The energy autocorrelation functions for a $40x40$ grid, for the indicated values of $\beta$ and for the disordered (high 
+    temperature beginning condition). The time difference, or lag, is measured in sweeps.}
+
+\label{fig:ac_energy}
+\end{figure}
+
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{ac1_metropolis_40x40_MCS200000_si1_minT2_maxT3_5_False_magnetization_acf.png}}
+  \caption{The magnetization autocorrelation functions for a $40x40$ grid, for the indicated values of $\beta$ and for the disordered (high 
+    temperature beginning condition). The time difference, or lag, is measured in sweeps.}
+
+\label{fig:ac_mag}
+\end{figure}
+
+In both of the above figures, we can see anomalous behavior in two of the three values of $\beta$. We see a rather steady increase
+ in the correlation time for the lowest three values of $\beta$, but then, for $\beta = 0.44$ the autocorrelation time suddenly
+ becomes much larger, in the case of the magnetization it does not even show an appreciable deviation from $1$ over the plotted 
+ values of the lag. And the, for $\beta = 0.5$, both the energy and magnetization autocorrelation times become much smaller, going
+ below the lower $\beta$ values. This can be interpreted as an an indication that something is happening to the system around the 
+ value $\beta = 0.44$, perhaps the first sign of a phase transition. 
+
+\pagebreak
+
+
+%###################################################################################################################################
+%########################## SECTION: Magnetization and magnetic suscepibility with metropolis ######################################
+%################################################################################################################################### 
+
+
+
+\section{Magnetization and magnetic suscepibility with metropolis}
+
+\section{The Wolff}
+
+\section{The 3D Ising model}
+\end{document}

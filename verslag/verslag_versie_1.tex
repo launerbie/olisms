@@ -109,6 +109,15 @@ An example of a cluster-flipping algorithm, the Wolff algorithm works by iterati
 The Wolff algorithm, although less intuitive than Metropolis has the advantage of being much faster near the critical temperature, thereby
  allowing us to obtain more accurate results in the region of interest.
 
+
+
+%###################################################################################################################################
+%########################## SECTION: Thermalization and autocorrelation for the 40x40 lattice ######################################
+%################################################################################################################################### 
+
+
+
+
 \section{Thermalization and autocorrelation for the 40x40 lattice}
 
 
@@ -116,27 +125,22 @@ In this section we present some results of a simulation of a 40x40 two dimension
  We present plots of energy and magnetization as a function of time and report the thermalization times found for each plot.
  We also plot autocorrelation functions for both enery and magnetization
  for five values of the inverse temperature $\beta$ between $\beta = 0.3$ and $\beta = 0.5$. 
- Both high temperature (fully disordered) and temperature (all spins aligned) initial conditions are simulated.
- Time is measured in Monte-Carlo steps per spin for all simulations. Each simlutation "takes" $32\cdot 10^6$ 
- Monte-Carlo steps.
+ Both high temperature (fully disordered) and low temperature (all spins aligned) initial conditions are simulated.
+ Time is measured in Monte-Carlo steps per spin for all simulations. One Monte-Carlo step per spin is called a "sweep", so
+ in the case of the 40x40 lattice, which contains 1600 spins, one sweep would correspond to 1600 spin flips. 
+
+
+%####
+%########################## SUBSECTION: Energy Functions ######################################
+%####
 
 
 \subsection{Energy functions}
-To find the thermalization times, we plot the energy as a function of time (measured in Monte-Carlo steps per site)
- and fit a general exponential curve and read off the characteristic time $\tau$:
+To find the thermalization times, we plot the energy as a function of time and read off the time (in sweeps) that it takes
+ the energy to reach a constant value. As we are not using a rigorous procedure these times will not be exact but will none 
+ the less serve as a rough estimate for setting the parameters for later simulations. 
 
-\begin{equation}\label{eq:exp_decay}
-    f(t)=Ae^{t/\tau} + C
-\end{equation}
-
-After a single characteristic time $\tau$, the value of the energy will be at about $37\%$ of its initial value and
- the system will not yet be thermalized. We therefore define the
- thermalization time as five times the characteristic time, just to be safe:
  
-\begin{equation*}
-    t_{therm} = 5\tau
-\end{equation*}
-
 Figure \ref{fig:Evt} shows the results of this procedure for the values $\beta = 0.3$; $\beta = 0.35$;
  $\beta = 0.4$; $\beta = 0.45$ and $\beta = 0.5$. Included are the acquired values of $t_{therm}$. Both 
  high temperature and low temperature initial conditions are covered.
@@ -165,6 +169,11 @@ Figure \ref{fig:Evt} shows the results of this procedure for the values $\beta =
          {\color{red}To add: the (calculated) values of the thermalization times per $\beta$)}}
 \label{fig:Evt}
 \end{figure}
+
+
+%####
+%########################## SUBSECTION: Magnetization functions ######################################
+%####
 
 
 \subsection{Magnetization functions}
@@ -196,6 +205,11 @@ Figure \ref{fig:Mvt} shows plots of magnetization versus time for the values $\b
          {\color{red}To add: the (calculated) values of the thermalization times per $\beta$}.}
 \label{fig:Mvt}
 \end{figure}
+
+
+%####
+%########################## SECTION: Autocorrelation functions ######################################
+%####
 
 
 \subsection{Autocorrelation functions}
@@ -238,6 +252,12 @@ where, $E_{avg}$ and $M_{avg}$ indicate averaging over the \textit{last} million
          b) Magnetization autocorrelation function.}
 \label{fig:autocorr}
 \end{figure}
+
+
+%###################################################################################################################################
+%########################## SECTION: Magnetization and magnetic suscepibility with metropolis ######################################
+%################################################################################################################################### 
+
 
 
 \section{Magnetization and magnetic suscepibility with metropolis}

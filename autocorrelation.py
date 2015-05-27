@@ -127,6 +127,7 @@ def make_acf_plot(h5pyfile, name, **kwargs):
 
 
     substitutions = (h5path, shape_as_string, algorithm)
+    ax1.set_title("{} autocorrelation".format(substitutions[0]))
 #    ax1.set_title("Time series data: {} \n{} {}".format(*substitutions))
 
 #    scalarmap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
