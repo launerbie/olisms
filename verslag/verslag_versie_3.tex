@@ -13,7 +13,7 @@
 %\DeclareFontShape{T1}{calligra}{m}{n}{<->s*[2.2]callig15}{}
 
 \setlength{\parindent}{0pt}
-\graphicspath{ {/home/lau/scratch/oli/plots_section_1/} }
+\graphicspath{ {/home/lau/scratch/oli/plots_section_1/} {/home/lau/scratch/oli/plots_section_2/} }
 
 \DeclarePairedDelimiter{\avg}{\langle}{\rangle}
 
@@ -192,7 +192,7 @@ From Figure \ref{fig:enmvt_true} we can conclude that the maximum thermalizaion 
  temperature starting condition. 
 
 %####
-%########################## SECTION: Autocorrelation functions ######################################
+%########################## SUBSECTION: Autocorrelation functions ######################################
 %####
 
 
@@ -278,7 +278,119 @@ In both of the above figures, we can see anomalous behavior in two of the three 
 
 \section{Magnetization and magnetic suscepibility with metropolis}
 
+In this section we present plots of average net magnetization (per spin) in thermal equilibrium as well as magnetic
+ susceptibiliy, as functions of the inverse temperature $\beta$. We present the results for various gridsizes and for
+ simulations done with both the Metropolis algorithm and the Wolff algorithm. \\
+
+The data sets generated for this section take into account the parameters defined in the previous section. So in order to
+ generate a data set, we first let the simulation run for the number of sweeps (or clusterflips in the case of Wolff) required
+ for the grid to thermalize before starting to save data. The interval between saves is chosen to be the maxiumum autocorrelation
+ time for a given gridsize in order to ensure that our data points are statistically independent. \\
+
+The average net magnetization is simply obtained by averaging the magnetization data set, which corresponds to time averaging in 
+ the physical sense. The magnetic susceptibility is obtained from the net magnetizaion through the following formula:
+
+
+\begin{equation*}
+  \chi = \frac{\beta}{N} (\langle |M|^2 \rangle - \langle |M| \rangle^2)
+\end{equation*}
+
+Here, the vertical bars indicate that the absolute value of the magnetizaion is taken and the $\langle \rangle$ indicate time
+ averaging and $N$ is the number of spins on the grid. 
+
+
+
+%####
+%########################## SUBSECTION: Metropolis algorithm ######################################
+%####
+
+ 
+
+\subsection{Metropolis algorithm}
+
+The Metropolis algorithm was used to simulate various lattice sizes. Here we show the average net magnetization and magnetic 
+ susceptibility plots for lattice sizes 20x20, 30x30, 40x40, 50,50 and 60x60, beginning with the 40x40 grid. The data was 
+ obtained by simulating each lattice for 25 values of $\beta$ between $\beta = 0.33$ and $\beta = 0.67$ and calculating the 
+ average net magnetization and magnetic susceptibility from the simulations. Figure \ref{fig:meto_40} shows the graphs for the
+ 40x40 lattice. 
+
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_40.png}}
+  \caption{Average net magnetization (left) and magnetic susceptibility (right) as functions of $\beta$ for the 40x40 grid.}
+
+\label{fig:meto_40}
+\end{figure}
+
+We can observe signs of a phase transtion is both plots. The Average net magnetization per spin is very low (near 0) for the 
+ small values of $\beta$ but increases to around 1 for higher values. The low net magnetization indicates the spins on the lattice
+ are disordered, with an approximatley equal number of spins having the value 1 as -1. High net magnetization means most spins are
+ "pointing in the same direction", i.e, have either the value 1 or -1, which indicates the system is in an ordered state. \\
+
+The magnetic susceptibility is known to diverge at the critical value of $\beta$ in the (theoretical) case of infinitely large grids.
+ In grids of finite size we expect the magnetic susceptibility to increase drastically around the critical point, which leads us 
+ to interpret the large peak in the susceptibility plot as a sign of a phase transition. The critical value of $\beta$ seems to 
+ be around $\beta = 0.44$, i.e. the value of $\beta$ near the maximum of the peak. 
+
+Figures \ref{fig:meto_20} to \ref{fig:meto_60} show the results for the remaining grid sizes. 
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_20.png}}
+  \caption{Lattice size: 20x20}
+
+\label{fig:meto_20}
+\end{figure}
+
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_30.png}}
+  \caption{Lattice size: 30x30}
+
+\end{figure}
+
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_50.png}}
+  \caption{Lattice size: 50x50}
+
+\end{figure}
+
+
+\begin{figure}[h!]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_60.png}}
+  \caption{Lattice size: 60x60}
+
+\label{fig:meto_60}
+\end{figure}
+
+
+
 \section{The Wolff}
 
 \section{The 3D Ising model}
 \end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
