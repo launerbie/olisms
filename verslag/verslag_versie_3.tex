@@ -8,6 +8,7 @@
 \usepackage{comment}
 \usepackage{subcaption}
 \usepackage{color}
+\usepackage{float}
 
 %\DeclareMathAlphabet{\mathcalligra}{T1}{calligra}{m}{n}
 %\DeclareFontShape{T1}{calligra}{m}{n}{<->s*[2.2]callig15}{}
@@ -17,7 +18,7 @@
 
 \DeclarePairedDelimiter{\avg}{\langle}{\rangle}
 
-\title{The Lau/Ostoji\'c Ising model simulation}
+\title{Ising model simulation}
 \date{}
 \author{Bernie Lau and Oliver Ostoji\'c}
 
@@ -35,37 +36,42 @@ $\avg{i,j}$ indicates a sum over nearest neighbors}
 \end{equation}
 
 As this apparently simple Hamiltonian is known to result in very interesting and rich dynamical behavior on a 
- macroscopic scale, we endeavor to find, through computational methods, some interesting thermodynamical quantities
+ macroscopic scale, we endeavor to find, through computational methods, some interesting thermodynamic quantities
  and qualitative behaviors. Of primary interest is the search for signs of a phase transistion, which the two and three
  dimensional Ising model is known to exhibit.
 
  In order to be less vague, we shall from now on talk about the Ising Hamiltonian
  in the context of ferromagnetism, where the quantites $s_i$ are associated with electron spins which can point in one of two
- directions. We will also set the coupling energy and the Boltzmann canstant equal to one, 
+ directions. We will also set the coupling energy and the Boltzmann constant equal to one, 
  $J = k_B = 1$, for all simulations. As a consequence, the inverse temperature $\beta = 1/k_BT$ is measured in unphysical
  units. This is justified by the
  fact that  we are primarily interested in the qualitative behavior of the system and all actual numbers in the following
  simulations can still be compared to theoretical calculations and similar simulations.
 
  Phase transitions are typically characterized by rapid changes in macroscopic quantities near the transition temperature, which
- is called the critical temperature, $T_c$. The macroscopic quantities we will be investigating are the net magnetization,
- $M = \sum_i s_i$, the magnetic susceptibility (a measure for how the magnetization reacts to external magnetic fields) and
- the correlation length (a measure for the length scale at which the spins influence each other). These quantities and their
- connection to phase transitions will be made more concrete in the relevant sections. 
+ is called the critical temperature, $T_c$. The thermodynamic quantities we will be investigating are the net magnetization,
+ $M = \sum_i s_i$ and the magnetic susceptibility, which is a measure for how the magnetization reacts to external magnetic fields.
+ These quantities and their connection to phase transitions will be made more concrete in the relevant sections. 
 
  The actual methods we employ are two Monte Carlo type algorithms, with most simulations carried out using a 
- Metropolis algorithm and a couple of measurements using a Wolff algorithm. It seems appropriate therefore, to summarize the
+ Metropolis algorithm and a couple of measurements using a Wolff algorithm. Therefore it seems appropriate to summarize the
  principles of those algorithms here, in a minimalistic fashion.
+
+
+%####
+%########################## SUBSECTION: Metropolis algorithm ######################################
+%####
+
 
 \subsection{Metropolis algorithm}
 As the focus of this assignment is on the \textit{implementation} of the Metropolis algorithm rather than its theoretical
  aspects, we have chosen to omit the technical details and just outline the procedure used in its implementation here.
 
  Given a
- lattice with a spin variable $s_i \in \{-1,1\}$ on each lattice point $i$, we define a "state" to be a particular
+ lattice with a spin variable $s_i \in \{-1,1\}$ on each lattice point $i$, a \textit{state} is defined as a particular
  configuration of all the ${s_i}$. The energy $E_\mu$ of the system in a state $\mu$ is determined by the Hamiltonian
  (Equation \ref{eq:Hamiltonian}). Time evolution of the system is achieved by randomly choosing a single site $j$ and determining
- the energy $E_\nu$ of the system if the spin on that site were flipped, $s_j \rightarrow -s_j$. Weather or not we actually flip
+ the energy $E_\nu$ of the system if the spin on that site were flipped, $s_j \rightarrow -s_j$. Whether or not we actually flip
  the spin is determined by the the number $A(\mu \rightarrow \nu)$ given by;
 
 
@@ -76,19 +82,26 @@ As the focus of this assignment is on the \textit{implementation} of the Metropo
     \end{cases}
 \end{equation}
 
-Once the spin flip is accepted or rejected, the process is repeated and each iteration is called a "Monte Carlo step". It is actually
- this particular definiton of the so called
- "acceptance ratio", $A(\mu \rightarrow \nu)$ that makes the algorihm a Metropolis algorithm,
+This process is repeated and each iteration is called a \textit{Monte Carlo step}.
+ It is actually this particular definiton of the so called
+ \textit{acceptance ratio}, $A(\mu \rightarrow \nu)$, that makes the algorithm a Metropolis algorithm,
  the rest of the procedure is common to all single spin-flip dynamics Monte Carlo algorithms. The conditions
  of detailed balance and ergodicity, which ensure that the
  equilibrium state of the system will behave according to Boltzmann statistics and that each state can be reached from each other state, are
  statisfied by this acceptance ratio, as must be the case with all Monte Carlo algorithms.
 
 
+%####
+%########################## SUBSECTION: Wolff algorithm ######################################
+%####
+
+
 \subsection{Wolff algorithm}
 An example of a cluster-flipping algorithm, the Wolff algorithm works by iteratively picking out
- an entire cluster of spins pointing in the same direction and then flipping them all at the same time. The actual physics content of this 
- procedure is contained in the generation of the cluster, which is done based on a temperature dependent probability chosen such that the
+ an entire cluster of spins pointing in the same direction and then flipping them all at the same time. The actual physics content
+ of this 
+ procedure is contained in the generation of the cluster, which is done based on a Boltzmann-factor dependent probability chosen
+ such that the
  conditions of detailed balance and ergodicity are satisfied.
  More specifically, the procedure which is iterated is as follows;
  \begin{enumerate}
@@ -102,12 +115,12 @@ An example of a cluster-flipping algorithm, the Wolff algorithm works by iterati
 
  \item For each spin that was added, look at all \textit{its} neighbors and add them with the same probability. Do this until no spins are left
  in the cluster whose neighbors have not been considered for addition.
- \item Flip the cluster
+ \item Flip the whole cluster
 
  \end{enumerate}
 
-The Wolff algorithm, although less intuitive than Metropolis has the advantage of being much faster near the critical temperature, thereby
- allowing us to obtain more accurate results in the region of interest.
+The Wolff algorithm, although less intuitive than Metropolis, has the advantage of being much faster near the critical temperature,
+ thereby allowing us to obtain more accurate results in the region of interest.
 
 
 \pagebreak
@@ -128,7 +141,7 @@ In this section we present some results of a simulation of a 40x40 two dimension
  We also plot autocorrelation functions for both enery and magnetization
  for five values of the inverse temperature $\beta$ between $\beta = 0.33$ and $\beta = 1.0$. 
  Both high temperature (fully disordered) and low temperature (all spins aligned) initial conditions are simulated.
- Time is measured in Monte-Carlo steps per spin for all simulations. One Monte-Carlo step per spin is called a "sweep", so
+ Time is measured in Monte-Carlo steps per spin for all simulations. One Monte-Carlo step per spin is called a \textit{sweep}, so
  in the case of the 40x40 lattice, which contains 1600 spins, one sweep would correspond to 1600 spin flips. 
 
 
@@ -137,7 +150,7 @@ In this section we present some results of a simulation of a 40x40 two dimension
 %####
 
 
-\subsection{Thermalilzation times}
+\subsection{Thermalization times}
 To find the thermalization times, we plot the energy and magnetization as a function of time and read off the time (in sweeps) that
  it takes the energy and the magnetization to reach a constant value. Both the energy and the magnetization are functions of the spin
  variables so, if all is well, the thermalization times for energy and magnetization should be the same. 
@@ -151,7 +164,7 @@ Figure \ref{fig:enmvt_false} shows the plots of the energy and the magnetization
  $\beta = 0.5$; $\beta = 0.67$ and $\beta = 1.0$. 
 
 
-\begin{figure}[h!]
+\begin{figure}[H]
   \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metropolis_40x40_MCS700_si1_minT1_maxT3_5_False_Energy_and_Magnetization.png}}
   \caption{Shown are the plots of energy per spin (left) and net magnetization per spin (right) as functions of time
     for a 40x40 two dimensional lattice. The starting condition is a fully
@@ -176,7 +189,7 @@ Figure \ref{fig:enmvt_true} again shows plots of energy and magnetization as fun
  state corresponding to a low temperature situation. 
 
 
-\begin{figure}[h!]
+\begin{figure}[H]
 
   \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metropolis_40x40_MCS700_si1_minT1_maxT3_5_True_Energy_and_Magnetization.png}}
   \caption{Shown are the plots of energy per spin (left) and net magnetization per spin (right) as functions of time
@@ -200,18 +213,18 @@ From Figure \ref{fig:enmvt_true} we can conclude that the maximum thermalizaion 
 From the simulations in the previous section we extracted the thermalization times for our 40x40 grid. In addition to the thermalization
  time, the other relevant time parameter is the autocorrelation time. Autocorrelation is, roughly and broadly speaking, a measure for the
  similarity of some system with itself at different times. The variable on which autocorrelation depends is therefore the \textit{difference}
- between two time instances which is called "lag". The admissible values for autocorrelation are the range $[0,1]$, with $1$ meaning
+ between two time instances which is called \textit{lag}. The admissible values for autocorrelation are the range $[0,1]$, with $1$ meaning
  the system is identical to itself and $0$ meaning the system bears no resemblence to itself at all.
  The autocorrelation \textit{time} is the minimal amount of time that needs to pass for the sytem to no
  longer bear resemblence to itself, so for the autocorrelation to be zero. The reason we are interested in autocorrelation times is this:
- if we have a time dependent statistical process from which we
+ if our system is a time dependent statistical process from which we
  take samples at different times and the autocorrelation between those samples is zero, those samples are statistically independent from 
  one another. We therefore interpret the autocorrelation time as the parameter that tells us how long we need to wait before we can take
  another statistically independent sample. 
  \\ 
  
 
- For us, "system" means either the equilibrium energy or the net magnetization for a given simulation, so for a given grid 
+ For us, \textit{system} means either the equilibrium energy or the net magnetization for a given simulation, so for a given grid 
  size, value of $\beta$ and beginning condition (and algorithm). \\
  So the question we are trying to answer in this section is: Given the equilibrium energy (or magnetization) for a certain simulation, as a
  function of time, what is the minimum amount of time that needs to pass before the autocorrelation is zero. 
@@ -229,10 +242,10 @@ and
 
 
 where, $E_{avg}$ and $M_{avg}$ indicate the average value of the energy and magnetization in thermal equilibrium and $\Delta t$
- is the time difference or "lag" between samples taken.
+ is the time difference or \textit{lag} between samples taken.
  This in contrast to the averaging indicated by the $\avg{}_t$, which means we average over the number of
  sweeps. The subscript $t$ indicates averaging over time, which is, as discussed above, measured in sweeps in the
- the case of the metropolis algorithm. 
+ the case of the Metropolis algorithm. 
 
 To put this into practice, we carried out simulations of a 40x40 grid like above, but we let it run for 200000 sweeps, and only 
  start saving data after the 500'th sweep, in order to assure that we are in thermal equilibrium. The value of 500 is based on the
@@ -241,7 +254,7 @@ To put this into practice, we carried out simulations of a 40x40 grid like above
  $\beta = 0.33$; $\beta = 0.36$; $\beta = 0.4$l $\beta = 0.44$ and $\beta = 0.5$ and for both the energy and the net magnetization. The 
  results are shown in Figures \ref{fig:ac_energy} and \ref{fig:ac_mag}. 
 
-\begin{figure}[h!]
+\begin{figure}[H]
 
   \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{ac1_metropolis_40x40_MCS200000_si1_minT2_maxT3_5_False_energy_acf.png}}
   \caption{The energy autocorrelation functions for a $40x40$ grid, for the indicated values of $\beta$ and for the disordered (high 
@@ -251,7 +264,7 @@ To put this into practice, we carried out simulations of a 40x40 grid like above
 \end{figure}
 
 
-\begin{figure}[h!]
+\begin{figure}[H]
 
   \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{ac1_metropolis_40x40_MCS200000_si1_minT2_maxT3_5_False_magnetization_acf.png}}
   \caption{The magnetization autocorrelation functions for a $40x40$ grid, for the indicated values of $\beta$ and for the disordered (high 
@@ -271,24 +284,23 @@ In both of the above figures, we can see anomalous behavior in two of the three 
 
 
 %###################################################################################################################################
-%########################## SECTION: Magnetization and magnetic suscepibility with metropolis ######################################
+%########################## SECTION: Magnetization and magnetic susceptibility with Metropolis ######################################
 %################################################################################################################################### 
 
 
 
-\section{Magnetization and magnetic suscepibility with metropolis}
+\section{Magnetization and magnetic susceptibility with Metropolis}
 
 In this section we present plots of average net magnetization (per spin) in thermal equilibrium as well as magnetic
- susceptibiliy, as functions of the inverse temperature $\beta$. We present the results for various gridsizes and for
+ susceptibiliy, as functions of the inverse temperature $\beta$. We present the results for various grid sizes and for
  simulations done with both the Metropolis algorithm and the Wolff algorithm. \\
 
 The data sets generated for this section take into account the parameters defined in the previous section. So in order to
  generate a data set, we first let the simulation run for the number of sweeps (or clusterflips in the case of Wolff) required
- for the grid to thermalize before starting to save data. The interval between saves is chosen to be the maxiumum autocorrelation
+ for the grid to thermalize before starting to save data. The interval between saves is chosen to be the maximum autocorrelation
  time for a given gridsize in order to ensure that our data points are statistically independent. \\
 
-The average net magnetization is simply obtained by averaging the magnetization data set, which corresponds to time averaging in 
- the physical sense. The magnetic susceptibility is obtained from the net magnetizaion through the following formula:
+The magnetic susceptibility is obtained from the net magnetization through the following formula:
 
 
 \begin{equation*}
@@ -315,7 +327,7 @@ The Metropolis algorithm was used to simulate various lattice sizes. Here we sho
  40x40 lattice. 
 
 
-\begin{figure}[h!]
+\begin{figure}[H]
 
   \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_40.png}}
   \caption{Average net magnetization (left) and magnetic susceptibility (right) as functions of $\beta$ for the 40x40 grid.}
@@ -323,56 +335,102 @@ The Metropolis algorithm was used to simulate various lattice sizes. Here we sho
 \label{fig:meto_40}
 \end{figure}
 
-We can observe signs of a phase transtion is both plots. The Average net magnetization per spin is very low (near 0) for the 
+We can observe signs of a phase transtion is both plots. The average net magnetization per spin is very low (near 0) for the 
  small values of $\beta$ but increases to around 1 for higher values. The low net magnetization indicates the spins on the lattice
- are disordered, with an approximatley equal number of spins having the value 1 as -1. High net magnetization means most spins are
- "pointing in the same direction", i.e, have either the value 1 or -1, which indicates the system is in an ordered state. \\
+ are disordered, with an approximately equal number of spins having the value 1 as -1. High net magnetization means most spins are
+ "pointing in the same direction", i.e, having \textit{either} the value 1 \textit{or} -1, which indicates the system is in an ordered
+ state. \\
 
 The magnetic susceptibility is known to diverge at the critical value of $\beta$ in the (theoretical) case of infinitely large grids.
  In grids of finite size we expect the magnetic susceptibility to increase drastically around the critical point, which leads us 
- to interpret the large peak in the susceptibility plot as a sign of a phase transition. The critical value of $\beta$ seems to 
- be around $\beta = 0.44$, i.e. the value of $\beta$ near the maximum of the peak. 
+ to interpret the large peak around in the susceptibility plot as a sign of a phase transition. The critical value of $\beta$ seems to 
+ be around $\beta = 0.44$. 
 
-Figures \ref{fig:meto_20} to \ref{fig:meto_60} show the results for the remaining grid sizes. 
+Figure \ref{fig:all_metro} shows the results for the remaining grid sizes. 
 
-\begin{figure}[h!]
+\begin{figure}[H]
 
-  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_20.png}}
-  \caption{Lattice size: 20x20}
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{all_metro.png}}
+  \caption{Magnetization and magnetic susceptibility plots for the remaining lattice sizes. The left collumn are the magnetization
+    plots and the right collumn are the susceptibility plots. From above to below are shown lattice sizes 20x20, 30x30, 50x50 and 
+    60x60.}
 
-\label{fig:meto_20}
+\label{fig:all_metro}
 \end{figure}
 
 
-\begin{figure}[h!]
+%####
+%########################## SUBSECTION: Wolff algorithm ######################################
+%####
 
-  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_30.png}}
-  \caption{Lattice size: 30x30}
+ 
 
+\subsection{Wolff algorithm}
+
+In addition to the Metropolis algorithm, we also simulated the Ising model for the above lattice sizes with the Wolff algorithm. The 
+ Wolff algorithm has the advantage of being quite fast near the critical temperature, as the autocorrelation times for the Wolff
+ algorithm are much smaller near the critical point than those of the Metropolis algorithm. However it has the disadvantage of being
+ very slow at low temperatures. For this reason we limited the range of $\beta$ at which we carry out simulations to values near
+ the critical temperature. Specifically, we simulated 25 values of $\beta$ between $\beta = 0.465$ and $\beta = 0.54$ for grid sizes
+ 20x20, 30x30, 40x40. For grid sizes 50x50 and 60x60 we also simulated 25 values of beta, but in the 
+ range $\beta = 0.455$ and $\beta = 0.526$.
+ Typical results are shown in Figures \ref{fig:wolff_first} and \ref{fig:wolff_last}.
+
+\begin{figure}[H]
+
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{wolff_20_30_40.png}}
+  \caption{Average net magnetization (left) and magnetic susceptibility (right) plots obtained with the 
+    Wolff algorithm for various grid sizes. The grid sizes from top to bottom: 20x20, 30x30 and 40x40.}
+
+\label{fig:wolff_first}
 \end{figure}
 
 
-\begin{figure}[h!]
+\begin{figure}[H]
 
-  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_50.png}}
-  \caption{Lattice size: 50x50}
+  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{wolff_50_60.png}}
+  \caption{Average net magnetization (left) and magnetic susceptibility (right) plots obtained with the 
+    Wolff algorithm for grid sizes 50x50 (top) and 60x60 (bottom).}
 
+\label{fig:wolff_last}
+\end{figure}
+
+Clearly, the simulations with Wolff algorithm also exhibit a phase transition. However, the critical value of $\beta$ 
+ obtained with the Wolff algorithm is different from the one obtained with the Metropolis algorithm, with the value now
+ being somewhere close to $\beta = 0.5$.
+
+\pagebreak
+
+
+%###################################################################################################################################
+%################################################# SECTION: Data Collapse ##########################################################
+%################################################################################################################################### 
+
+
+\section{Data Collapse}
+
+The final result we have obtained from these simulations is the data collapse of the magnetic susceptibility curves obtained with
+ the Wolff algorithm shown in the previous section. In real investigations one would try to find values of interest using the 
+ finite size scaling method. That method comes down to trying to find a grid size-dependent scaling function which depends on the
+ ratio of two (critical) exponents labelled $\gamma$ and $\nu$. Once the values of the critical exponents are found, and the scaling
+ function has been determined, one multiplies several data sets of the thermodynamic quantity he is researching by this 
+ scaling function and plots these rescaled data together. If the critical exponents are the correct ones, all the data should
+ collapse onto a single curve. \\
+
+We did not carry out the finite size scaling procedure. Instead, we implemented the scaling function with the values $\gamma = 1.76$
+ and $\nu = 1.00$, which we copied from theory. We multiplied the data sets used to generate the plots in Figures
+ \ref{fig:wolff_first} and \ref{fig:wolff_last}, and plotted the rescaled data together in Figure \ref{fig:data_collapse}.
+
+\begin{figure}[H]
+
+  \makebox[\textwidth][c]{\includegraphics[width=0.7\textwidth]{plot_4_data_collapse.png}}
+  \caption{Data collapse of the data generated with the Wolff algorithm. We used the values $\gamma = 1.76$ and $\nu = 1.00$, 
+    which we copied from theory. The dimensions of the (square) grids are indicated. }
+
+\label{fig:data_collapse}
 \end{figure}
 
 
-\begin{figure}[h!]
-
-  \makebox[\textwidth][c]{\includegraphics[width=1\textwidth]{metro_60.png}}
-  \caption{Lattice size: 60x60}
-
-\label{fig:meto_60}
-\end{figure}
-
-
-
-\section{The Wolff}
-
-\section{The 3D Ising model}
 \end{document}
 
 

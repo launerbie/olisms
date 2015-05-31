@@ -38,16 +38,6 @@ def plot_summary(f, name, directory):
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
 
-#    #Direct input 
-#    plt.rcParams['text.latex.preamble']=[r"\usepackage{lmodern}"]
-#    #Options
-#    params = {'text.usetex' : True,
-#              'font.size' : 15,
-#              'font.family' : 'lmodern',
-#              'text.latex.unicode': True,
-#              }
-#    plt.rcParams.update(params) 
-
     plt.rc('text', usetex=True)
     plt.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 
@@ -85,7 +75,8 @@ def plot_summary(f, name, directory):
         avg_net_mags.append(numpy.mean(net_M))
         chi.append(1/(T*N)*numpy.var(net_M))
 
-    betas = numpy.around(1.0/numpy.array(temperatures)[::-1], decimals = 2)
+    betas = 1.0/numpy.array(temperatures)[::-1]
+#    betas = numpy.around(1.0/numpy.array(temperatures)[::-1], decimals = 2)
     reversed_net_mags = numpy.array(avg_net_mags)[::-1]
     reversed_chi = numpy.array(chi)[::-1]
 
